@@ -48,7 +48,7 @@ cat("Num Rows after Filtering: ", nrow(omg_edge_df_filtered), "\n")
 cat("Num Rows cut: ", (nrow(omg_edge_df)-nrow(omg_edge_df_filtered)), "\n")
 
 # Set omg_edge_df to the filtered dataframe
-omg_edge_df %>% filter(tokenAmount >= decimals * supply) %>% nrow()
+omg_edge_df = omg_edge_df %>% filter(tokenAmount <= decimals * supply)
 
 
 
@@ -83,3 +83,34 @@ sells_quant_bar = ggplot(data=selldf, aes(x=row_id, y=n)) +
   geom_text(aes(label=n), vjust=-0.3, size=3.5)+
   theme_minimal()
 print(sells_quant_bar)
+
+# Create a bar chart to plot the top 20 sellers by their total tokens sold.
+buydf = buys.distribution %>% arrange(-n) %>% head(20)
+buydf$row_id <- as.numeric(row.names(buydf))
+buys_quant_bar = ggplot(data=buydf, aes(x=row_id, y=n)) +
+  geom_bar(stat="identity", fill="steelblue")+
+  geom_text(aes(label=n), vjust=-0.3, size=3.5)+
+  theme_minimal()
+print(buys_quant_bar)
+
+
+# Sort into sale partners per question 2
+cat("\n\nQuestion 2\n\n")
+transaction_pair_df <- omg_edge_df
+transaction_pair_df$pair = paste(as.character(transaction_pair_df$fromID),"-",as.character(transaction_pair_df$toID))
+transactions_by_pair_df = transaction_pair_df %>% group_by(pair) %>% summarise(n = n()) %>% arrange(-n) %>% ungroup
+print(transactions_by_pair_df %>% head(20))
+
+# Optionally Drop out the outlier pair(311608 - 311608), n(30024)
+# Comment this line out if you want to leave it in
+transactions_by_pair_df = transactions_by_pair_df %>% filter(n < 30000)
+
+# Create a bar chart to plot the top 50 transaction address pairs
+pairdf = transactions_by_pair_df %>% head(50)
+pairdf$row_id <- as.numeric(row.names(pairdf))
+pair_bar = ggplot(data=pairdf, aes(x=row_id, y=n)) +
+  geom_bar(stat="identity", fill="steelblue")+
+  # geom_text(aes(label=n), vjust=-0.3, size=3.5)+
+  theme_minimal()
+print(pair_bar)
+
