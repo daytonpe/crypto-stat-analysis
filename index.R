@@ -5,10 +5,12 @@
 # install.packages("readr")
 # install.packages("ggplot2")
 # install.packages("dply")
+# install.packages("fitdist")
 library(plyr)
 library(readr)
 library(ggplot2)
 library(dplyr)
+library(fitdistrplus)
 
 setwd('/Users/daytonpe/Dropbox/utd/6316_stat_methods_for_ds_akcora/project/src')
 
@@ -105,12 +107,23 @@ print(transactions_by_pair_df %>% head(20))
 # Comment this line out if you want to leave it in
 transactions_by_pair_df = transactions_by_pair_df %>% filter(n < 30000)
 
+
+# Try to fit a distribution to the transaction pairs amounts
+fit.gamma.pairdf = fitdist(pairdf$n, 'gamma')
+# fit.exp.pairdf = fitdist(pairdf$n, 'exp') # Don't know why this one is breaking...
+# fit.geometric.pairdf = fitdist(pairdf$n, 'geom')
+fit.log.pairdf <- fitdist(pairdf$n, 'logis')
+fit.lnorm.pairdf = fitdist(pairdf$n, 'lnorm')
+
+print(fit.lnorm.pairdf)
+
+gofstat(list(fit.gamma.pairdf, fit.log.pairdf, fit.lnorm.pairdf))
+
 # Create a bar chart to plot the top 50 transaction address pairs
 pairdf = transactions_by_pair_df %>% head(50)
 pairdf$row_id <- as.numeric(row.names(pairdf))
 pair_bar = ggplot(data=pairdf, aes(x=row_id, y=n)) +
   geom_bar(stat="identity", fill="steelblue")+
-  # geom_text(aes(label=n), vjust=-0.3, size=3.5)+
+  # stat_function(fun = fit.lnorm.pairdf, size=1, color='gray')+
   theme_minimal()
 print(pair_bar)
-
