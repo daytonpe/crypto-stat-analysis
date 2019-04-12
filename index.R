@@ -1,60 +1,85 @@
 # CS6313: Statistial Methods for Data Science -S19
 # Pat Dayton and AJ Rahendran
 
-# install.packages("dplyr")
+# install.packages("plyr")
+# install.packages("readr")
+# install.packages("ggplot2")
+# install.packages("dply")
 library(plyr)
 library(readr)
 library(ggplot2)
 library(dplyr)
 
+setwd('/Users/daytonpe/Dropbox/utd/6316_stat_methods_for_ds_akcora/project/src')
+
 # The modulo of the sum of our UTD IDs was 2, so we will be using tronix, omisego, and yocoin
 
 # Load in the Etherium Tokens Information
-df <- read.table("./tokenPrices/OMISEGO",
+omg_price_df = read.table("./tokenPrices/omisego.txt",
                  col.names = c('Date',	'Open',	'High',	'Low',	'Close',	'Volume',	'MarketCap'),
                  skip = 1,
                  header = FALSE)
 
 # Check for duplicated
-cat("Number of duplicates: ", anyDuplicated(df), "\n")
+cat("Number of duplicates: ", anyDuplicated(omg_price_df), "\n")
 
 # Convert date to the correct format
-df$Date = as.Date(df$Date,format='%m/%d/%Y')
+omg_price_df$Date = as.Date(omg_price_df$Date,format='%m/%d/%Y')
 
 
 # Plot Opening Price over Time
-p = ggplot(aes(x=Date, y=Open), data = df) + geom_point()
-# print(p)
-
-omisego <- read_delim('./edgeFiles/omisego.txt', delim = " ", col_names = F)
-
-names(omisego) <- c('fromID', 'toID', 'unixTime', 'tokenAmount')
-# Example:
-# 142341 75994 1524611536 5301102205520000000000
-
-decimals <- 10^18 # correct for omisego
-supply <- 140245398 # correct for omisego
-
-omisegoFiltered <- omisego %>% filter(tokenAmount < decimals * supply)
-
-## Find number of transactions with > 10^18 tokens
-## This is negligable, so move on.
-omisego %>% filter(tokenAmount >= decimals * supply) %>% nrow()
-
-## number of buys by user id
-buys.distribution <- omisegoFiltered %>% group_by(toID) %>% summarise(n = n()) %>% ungroup
-
-## show highest 10 buyers and their number of buys 
-print(buys.distribution %>% arrange(-n) %>% head(10))
-
-## number of sells by user id
-sells.distribution <- omisegoFiltered %>% group_by(fromID) %>% summarise(n = n()) %>% ungroup
-
-## show highest 10 buyers and their number of buys 
-selldf <- sells.distribution %>% arrange(-n) %>% head(10)
-
-print(selldf)
-p<-ggplot(data=selldf, aes(x=0, y=1)) +
-  geom_bar(stat="identity")
+p = ggplot(aes(x=Date, y=Open), data = omg_price_df) + geom_point()
 print(p)
 
+omg_edge_df <- read_delim('./edgeFiles/omisego.txt', delim = " ", col_names = F)
+
+# Extract the data from the omisego edge file. Example:
+# 142341 75994 1524611536 5301102205520000000000
+names(omg_edge_df) <- c('fromID', 'toID', 'unixTime', 'tokenAmount')
+
+
+decimals = 10^18 # correct for omisego
+supply = 140245398 # correct for omisego
+
+# Filter out rows where the token amount is greater than the total tokenAmount
+omg_edge_df_filtered = omg_edge_df %>% filter(tokenAmount < decimals*supply)
+cat("Num Rows before Filtering: ", nrow(omg_edge_df), "\n")
+cat("Num Rows after Filtering: ", nrow(omg_edge_df_filtered), "\n")
+cat("Num Rows cut: ", (nrow(omg_edge_df)-nrow(omg_edge_df_filtered)), "\n")
+
+# Set omg_edge_df to the filtered dataframe
+omg_edge_df %>% filter(tokenAmount >= decimals * supply) %>% nrow()
+
+
+
+
+####################### Question 1 ##############################
+# Find the distribution of how many times a pair users 
+# (i.e., address1 and address2) 1 - buys, 2 - sells a token with each other. 
+# Which distribution type fits these distributions best? 
+# Estimate population distribution parameters.
+#################################################################
+
+
+# number of buys and sells by user id
+# Great description here: https://stackoverflow.com/questions/25869378/what-does-n-n-mean-in-r
+buys.distribution <- omg_edge_df %>% group_by(toID) %>% summarise(n = n()) %>% ungroup
+sells.distribution <- omg_edge_df %>% group_by(fromID) %>% summarise(n = n()) %>% ungroup
+
+## show highest 20 buyers and their number of buys 
+cat("Buys Top 20")
+print(buys.distribution %>% arrange(-n) %>% head(20))
+
+
+## show highest 20 buyers and their number of buys 
+cat("Sells Top 20")
+print(sells.distribution %>% arrange(-n) %>% head(20))
+
+# Create a bar chart to plot the top 20 sellers by their total tokens sold.
+selldf = sells.distribution %>% arrange(-n) %>% head(20)
+selldf$row_id <- as.numeric(row.names(selldf))
+sells_quant_bar = ggplot(data=selldf, aes(x=row_id, y=n)) +
+  geom_bar(stat="identity", fill="steelblue")+
+  geom_text(aes(label=n), vjust=-0.3, size=3.5)+
+  theme_minimal()
+print(sells_quant_bar)
