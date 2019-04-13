@@ -103,27 +103,47 @@ transaction_pair_df$pair = paste(as.character(transaction_pair_df$fromID),"-",as
 transactions_by_pair_df = transaction_pair_df %>% group_by(pair) %>% summarise(n = n()) %>% arrange(-n) %>% ungroup
 print(transactions_by_pair_df %>% head(20))
 
+# Calculate Total Traded Valume (1120702)
+total_trade_volume = sum(transactions_by_pair_df$n)
+
 # Optionally Drop out the outlier pair(311608 - 311608), n(30024)
 # Comment this line out if you want to leave it in
 transactions_by_pair_df = transactions_by_pair_df %>% filter(n < 30000)
+cat('FILTERING!\n')
+
+pairdf = transactions_by_pair_df %>% head(100)
+pairdf$row_id <- as.numeric(row.names(pairdf))
+
+# normalize by total_trade_volume
+pairdf$n = pairdf$n / total_trade_volume
+print(pairdf$n)
+
+# scaled.pairdf <- pairdf %>% mutate_each_(funs(scale(.) %>% as.vector), 
+                                          # vars=c("n"))
 
 
 # Try to fit a distribution to the transaction pairs amounts
-fit.gamma.pairdf = fitdist(pairdf$n, 'gamma')
+# fit.gamma.pairdf = fitdist(pairdf$n, 'gamma')
 # fit.exp.pairdf = fitdist(pairdf$n, 'exp') # Don't know why this one is breaking...
 # fit.geometric.pairdf = fitdist(pairdf$n, 'geom')
-fit.log.pairdf <- fitdist(pairdf$n, 'logis')
+# fit.log.pairdf <- fitdist(pairdf$n, 'logis')
+fit.exp.pairdf = fitdist(pairdf$n, 'exp')
 fit.lnorm.pairdf = fitdist(pairdf$n, 'lnorm')
+# fit.weibull.pairdf <- fitdist(pairdf$n, 'weibull')
 
-print(fit.lnorm.pairdf)
+print(fit.exp.pairdf)
 
-gofstat(list(fit.gamma.pairdf, fit.log.pairdf, fit.lnorm.pairdf))
+gofstat(fit.lnorm.pairdf)
+
+gofstat(list(fit.log.pairdf, fit.lnorm.pairdf))
 
 # Create a bar chart to plot the top 50 transaction address pairs
-pairdf = transactions_by_pair_df %>% head(50)
-pairdf$row_id <- as.numeric(row.names(pairdf))
 pair_bar = ggplot(data=pairdf, aes(x=row_id, y=n)) +
-  geom_bar(stat="identity", fill="steelblue")+
-  # stat_function(fun = fit.lnorm.pairdf, size=1, color='gray')+
+  # ylim(0, .0035) +
+  geom_bar(stat="identity", fill="steelblue") +
+  stat_function(fun = dlnorm, args = list(meanlog = .15, sdlog = 100, log = FALSE),  size=1, color = "red") +
+  # stat_function(fun = dexp, args = list(rate = 10),  size=1, color = "green")+
   theme_minimal()
 print(pair_bar)
+
+
