@@ -111,68 +111,59 @@ total_trade_volume = sum(transactions_by_pair_df$n)
 transactions_by_pair_df = transactions_by_pair_df %>% filter(n < 30000)
 cat('FILTERING!\n')
 
+
+# Filtering and scaling the data in different ways.
 pairdf = transactions_by_pair_df %>% head(100)
-print(sum(pairdf$n))
-
 pairdf$row_id <- as.numeric(row.names(pairdf))
-
 pairdf$n_scaled <- (pairdf$n - min(pairdf$n) + 0.001) / (max(pairdf$n) - min(pairdf$n) + 0.002)
-
 # Reverse it so it goes up and right
 # pairdf$n_scaled <- rev(pairdf$n_scaled)
-
-print(pairdf$n_scaled)
 # normalize by total_trade_volume
 pairdf$n_norm = pairdf$n / total_trade_volume
 
 
-print(pairdf$n_scaled)
-fit.lnorm.pairdf = fitdistr(pairdf$n_scaled, densfun='lognormal')
-fit.exp.pairdf = fitdistr(pairdf$n_scaled, densfun='exponential')
-print(fit.exp.pairdf)
 
-# fit.beta.pairdf = fitdistr(pairdf$n_scaled, densfun='beta', start = list(shape1 = .5, shape2 = .5))
-print(fit.lnorm.pairdf)
-# print(fit.beta.pairdf)
-# fit.pois.pairdf = fitdist(pairdf$n, 'pois')
-# fit.weibull.pairdf <- fitdist(pairdf$n, 'weibull')
+# Put the data in the correct format
+as.data.frame(pairdf)
+keeps <- c("n_scaled", "n", "row_id")
+clean_data <- as.data.frame(pairdf)[keeps]
 
-print(fit.exp.pairdf$estimate[1])
 
-# gofstat(fit.lnorm.pairdf)
+fit.lnorm.pairdf = fitdistr(clean_data$n, densfun='lognormal')
+fit.exp.pairdf = fitdistr(clean_data$n, densfun='exponential')
+fit.geom.pairdf = fitdistr(clean_data$n, densfun='geometric')
+fit.pois.pairdf = fitdistr(clean_data$n, densfun='Poisson')
+print(fit.geom.pairdf$estimate[1])
 
 # gofstat(list(fit.log.pairdf, fit.lnorm.pairdf))
 
-as.data.frame(pairdf)
-keeps <- c("", "a")
-
-clean_data <- as.data.frame(pairdf)[row_id]
-
 # Create a bar chart to plot the top 50 transaction address pairs
-pair_bar = ggplot(as.data.frame(pairdf)) +
+# This site was helpful: https://stackoverflow.com/questions/49137824/ggplot-scale-transformation-inaccurate-for-stat-function
+pair_bar = ggplot(clean_data) +
   # scale_y_continuous(trans = 'log10') +
-  # ylim(0, .0035) +
+  # ylim(0, 8) +
+  # xlim(0, 1) +
   
-  # geom_histogram(mapping = aes(x=row_id, y=n_scaled), stat = "density", fill="steelblue") +
+  geom_histogram(mapping = aes(x = n), stat = "density", fill="steelblue")   +
   
-  geom_histogram(stat = "density", aes(x=row_id, y=n_scaled))  +
+  
   stat_function( fun = "dlnorm",
-                args = list(meanlog = -4, sdlog = 1),
-                n = 501,
+                args = list(meanlog = fit.lnorm.pairdf$estimate[1], sdlog = fit.lnorm.pairdf$estimate[2]),
+                n = 100,
+                size = 1,
                 color = "red") +
-  # stat_function(fun = dlnorm,
-  #               args = list(meanlog = fit.lnorm.pairdf$estimate[1],
-  #                           sdlog = fit.lnorm.pairdf$estimate[2]),
-  #               size=1,
-  #               color = "red") +
   
+
+  stat_function(fun = "dexp",
+                size = 1,
+                args = list(rate = fit.exp.pairdf$estimate[1]),
+                color = "green") +
   
-  # stat_function(fun = dexp,
-  #               aes(row_id),
-  #               color = "green") +
-  # stat_function(fun = dexp, list(rate = fit.exp.pairdf$estimate[1]), colour = "green") +
-  # stat_function(fun = dlnorm, args = list(meanlog = -3.36, sdlog =10.94, log = FALSE),  size=1, color = "green") +
-  # stat_function(fun = dexp, args = list(rate = 10),  size=1, color = "green")+
+  stat_function(fun = "dgeom",
+                size = 1,
+                args = list(prob = fit.geom.pairdf$estimate[1]),
+                color = "blue") +
+
   theme_minimal()
 
 # Can do this later...
@@ -180,16 +171,5 @@ pair_bar = ggplot(as.data.frame(pairdf)) +
 
 print(pair_bar)
 
-
-set.seed(42)
-
-dat <- data.frame(x = rlnorm(1000, meanlog = -4, sdlog = 1))
-print(class(dat))
-ggplot(dat) +
-  geom_histogram(mapping = aes(x = x), stat = "density")  +
-  stat_function(fun = "dlnorm",
-                args = list(meanlog = -4, sdlog = 1),
-                n = 501,
-                color = "red")
 
 
