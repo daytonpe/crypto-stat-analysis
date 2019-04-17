@@ -52,17 +52,24 @@ tron_processed <- subset(tronTransactions, Quantity <= decimals*circulating_supp
 Find the distribution number of transactions between the same buyers and sellers
 ```{r}
 library(dplyr)
+library(ggplot2)
 #install.packages("dplyr")
 colnames(tron_processed) <- c("Time", "Seller", "Buyer", "Amount")
 buyers <- c(tron_processed$Buyer)
+sellers <- c(tron_processed$Seller)
 amount <- c(tron_processed$Amount)
 
 plot(amount~buyers)
+
+plot(amount~sellers)
 
 #print(buyers)
 
 buyers_dist <- tron_processed %>% group_by(Buyer) %>% summarise(n =n()) %>% ungroup
 
+sellers_dist <- tron_processed %>% group_by(Seller) %>% summarise(n =n()) %>% ungroup
+
+ggplot(buyers_dist, aes_(x=0, y=1)) + geom_bar(stat='identity')
 #buyers_table <- as.data.frame(buyers)
 #buyers_table <- unique(buyers_table)
 #View(unique(buyers_table))
