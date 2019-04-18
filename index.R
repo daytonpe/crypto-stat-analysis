@@ -5,7 +5,7 @@
 # install.packages("readr")
 # install.packages("ggplot2")
 # install.packages("dply")
-# install.packages("fitdist")
+# install.packages("fitdistrplus")
 library(plyr)
 library(readr)
 library(ggplot2)
@@ -127,15 +127,25 @@ pairdf$n_norm = pairdf$n / total_trade_volume
 as.data.frame(pairdf)
 keeps <- c("n_scaled", "n", "row_id")
 clean_data <- as.data.frame(pairdf)[keeps]
+print(clean_data)
 
 
 fit.lnorm.pairdf = fitdistr(clean_data$n, densfun='lognormal')
 fit.exp.pairdf = fitdistr(clean_data$n, densfun='exponential')
 fit.geom.pairdf = fitdistr(clean_data$n, densfun='geometric')
-fit.weibull.pairdf = fitdistr(clean_data$n, densfun='weibull', start=list(shape=1, scale=500))
-print(fit.weibull.pairdf$estimate[1])
+fit.weibull.pairdf = fitdistr(clean_data$n, densfun='weibull')
+fit.gamma.pairdf = fitdistr(clean_data$n, densfun='gamma')
+fit.nbinomial.pairdf = fitdistr(clean_data$n, densfun='negative binomial')
 
-# gofstat(list(fit.log.pairdf, fit.lnorm.pairdf))
+# Take a look at the goodness of fit statistics
+# gofstat(list(fit.lnorm.pairdf, 
+#              fit.exp.pairdf,
+#              fit.geom.pairdf,
+#              fit.weibull.pairdf,
+#              fit.gamma.pairdf,
+#              fit.nbinomial.pairdf))
+
+# gofstat(list(fit.lnorm.pairdf))
 
 # Create a bar chart to plot the top 50 transaction address pairs
 # This site was helpful: https://stackoverflow.com/questions/49137824/ggplot-scale-transformation-inaccurate-for-stat-function
@@ -152,23 +162,34 @@ pair_bar = ggplot(clean_data) +
                 n = 100,
                 size = 1,
                 color = "red") +
-  
 
   stat_function(fun = "dexp",
                 size = 1,
                 args = list(rate = fit.exp.pairdf$estimate[1]),
                 color = "green") +
-  
-  # stat_function(fun = "dgeom",
-  #               size = 1,
-  #               args = list(prob = fit.geom.pairdf$estimate[1]),
-  #               color = "blue") +
-  
+
   stat_function(fun = "dweibull",
                 size = 1,
                 args = list(shape = fit.weibull.pairdf$estimate[1], scale=fit.weibull.pairdf$estimate[2]),
                 color = "orange") +
-
+  
+  stat_function(fun = "dgamma",
+                size = 1,
+                args = list(shape = fit.gamma.pairdf$estimate[1], rate=fit.gamma.pairdf$estimate[2]),
+                color = "purple") +
+  
+  
+  # The ones below here are somewhat uselss for the full dataset
+  stat_function(fun = "dgeom",
+                size = 2,
+                args = list(prob = fit.geom.pairdf$estimate[1]),
+                color = "blue") +
+  
+  stat_function(fun = "dnbinom",
+                size = 1,
+                args = list(size = fit.nbinomial.pairdf$estimate[1], mu=fit.nbinomial.pairdf$estimate[2]),
+                color = "pink") +
+  
 
   theme_minimal()
 
