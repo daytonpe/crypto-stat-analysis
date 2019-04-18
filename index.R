@@ -132,8 +132,8 @@ clean_data <- as.data.frame(pairdf)[keeps]
 fit.lnorm.pairdf = fitdistr(clean_data$n, densfun='lognormal')
 fit.exp.pairdf = fitdistr(clean_data$n, densfun='exponential')
 fit.geom.pairdf = fitdistr(clean_data$n, densfun='geometric')
-fit.pois.pairdf = fitdistr(clean_data$n, densfun='Poisson')
-print(fit.geom.pairdf$estimate[1])
+fit.weibull.pairdf = fitdistr(clean_data$n, densfun='weibull', start=list(shape=1, scale=500))
+print(fit.weibull.pairdf$estimate[1])
 
 # gofstat(list(fit.log.pairdf, fit.lnorm.pairdf))
 
@@ -159,10 +159,16 @@ pair_bar = ggplot(clean_data) +
                 args = list(rate = fit.exp.pairdf$estimate[1]),
                 color = "green") +
   
-  stat_function(fun = "dgeom",
+  # stat_function(fun = "dgeom",
+  #               size = 1,
+  #               args = list(prob = fit.geom.pairdf$estimate[1]),
+  #               color = "blue") +
+  
+  stat_function(fun = "dweibull",
                 size = 1,
-                args = list(prob = fit.geom.pairdf$estimate[1]),
-                color = "blue") +
+                args = list(shape = fit.weibull.pairdf$estimate[1], scale=fit.weibull.pairdf$estimate[2]),
+                color = "orange") +
+
 
   theme_minimal()
 
