@@ -13,23 +13,33 @@ Try executing this chunk by clicking the *Run* button within the chunk or by pla
 Load particular libraries and csv files of coin price and transactions.
 ```{r}
 library(plyr)
+library(readr)
 library(ggplot2)
+library(dplyr)
+library(fitdistrplus)
 
 #set working directory to project folder
 
 setwd('C:/Users/Adharsh/Documents/2019_Spring/Statistics/R Project')
 
 #read in text file of Tron token historical data
-tron <- read.csv(file = "tron", header = T, sep = "\t")
-colnames(tron) <- c("Date","Open","High","Low","Close","Volume","Market Cap") 
+tron_price_df = read.table("tron",
+                          col.names = c('Date',	'Open',	'High',	'Low',	'Close',	'Volume',	'MarketCap'),
+                          skip = 1,
+                          header = FALSE)
 
 #display summary of results
 #summary(tron)
 
+cat("Number of duplicates: ", anyDuplicated(tron_price_df), "\n")
+
+tron_price_df$Date = as.Date(tron_price_df$Date,format='%m/%d/%Y')
+
 message("Number of rows in tron transactions data: ", nrow(tron))
 
 tronTransactions <- read.csv(file = "tronixTransactions.csv", header = T)
-summary(tronTransactions)
+names(tron_edge_df) <- c('unixTime', 'fromID', 'toID', 'tokenAmount')
+#summary(tronTransactions)
 
 message("Number of rows in tron data: ", nrow(tronTransactions))
 ```
@@ -39,37 +49,46 @@ After calculating there are no such records.
 decimals <- 10^6
 circulating_supply <- 66682072191
 
-outliers <- subset(tronTransactions, Quantity > decimals*circulating_supply)
+tron_edge_df_filtered = tron_edge_df %>% filter(tokenAmount < decimals*supply)
+cat("Num Rows before Filtering: ", nrow(tron_edge_df), "\n")
+cat("Num Rows after Filtering: ", nrow(tron_edge_df_filtered), "\n")
+cat("Num Rows cut: ", (nrow(tron_edge_df)-nrow(tron_edge_df_filtered)), "\n")
 
 ```
 
 Preprocess the data
 ```{r}
-tron_processed <- subset(tronTransactions, Quantity <= decimals*circulating_supply)
+tron_edge_df = tron_edge_df %>% filter(tokenAmount <= decimals * supply)
 ```
 
 
 Find the distribution number of transactions between the same buyers and sellers
 ```{r}
-library(dplyr)
-library(ggplot2)
-#install.packages("dplyr")
-colnames(tron_processed) <- c("Time", "Seller", "Buyer", "Amount")
-buyers <- c(tron_processed$Buyer)
-sellers <- c(tron_processed$Seller)
-amount <- c(tron_processed$Amount)
+buys.distribution <- tron_edge_df %>% group_by(toID) %>% summarise(n = n()) %>% ungroup
+sells.distribution <- tron_edge_df %>% group_by(fromID) %>% summarise(n = n()) %>% ungroup
+# buyers <- c(tron_processed$Buyer)
+# sellers <- c(tron_processed$Seller)
+# amount <- c(tron_processed$Amount)
+# 
+# plot(amount~buyers)
+# 
+# plot(amount~sellers)
+# 
+# plot(buyers~sellers)
 
-plot(amount~buyers)
+cat("Buys Top 20")
+print(buys.distribution %>% arrange(-n) %>% head(20))
 
-plot(amount~sellers)
+cat("Sells Top 20")
+print(sells.distribution %>% arrange(-n) %>% head(20))
 
 #print(buyers)
 
-buyers_dist <- tron_processed %>% group_by(Buyer) %>% summarise(n =n()) %>% ungroup
+#buyers_dist <- tron_processed %>% group_by(Buyer) %>% summarise(n =n()) %>% ungroup
 
-sellers_dist <- tron_processed %>% group_by(Seller) %>% summarise(n =n()) %>% ungroup
+#sellers_dist <- tron_processed %>% group_by(Seller) %>% summarise(n =n()) %>% ungroup
 
-ggplot(buyers_dist, aes_(x=0, y=1)) + geom_bar(stat='identity')
+#ggplot(buyers_dist, aes_(x=0, y=1)) + geom_bar(stat='identity')
 #buyers_table <- as.data.frame(buyers)
 #buyers_table <- unique(buyers_table)
 #View(unique(buyers_table))
@@ -79,8 +98,101 @@ ggplot(buyers_dist, aes_(x=0, y=1)) + geom_bar(stat='identity')
 #buyer_freq <- (as.data.frame(table(buyers_table[,'Freq'])))
 ```
 
-Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+```{r}
+selldf = sells.distribution %>% arrange(-n) %>% head(20)
+selldf$row_id <- as.numeric(row.names(selldf))
+sells_quant_bar = ggplot(data=selldf, aes(x=row_id, y=n)) +
+  geom_bar(stat="identity", fill="steelblue")+
+  geom_text(aes(label=n), vjust=-0.3, size=3.5)+
+  theme_minimal()
+print(sells_quant_bar)
 
-When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+# Create a bar chart to plot the top 20 sellers by their total tokens sold.
+buydf = buys.distribution %>% arrange(-n) %>% head(20)
+buydf$row_id <- as.numeric(row.names(buydf))
+buys_quant_bar = ggplot(data=buydf, aes(x=row_id, y=n)) +
+  geom_bar(stat="identity", fill="steelblue")+
+  geom_text(aes(label=n), vjust=-0.3, size=3.5)+
+  theme_minimal()
+print(buys_quant_bar)
+```
+Start of Question 2, getting the pairs of buyers and sellers
+```{r}
+transaction_pair_df <- tron_edge_df
+transaction_pair_df$pair = paste(as.character(transaction_pair_df$fromID),"-",as.character(transaction_pair_df$toID))
+transactions_by_pair_df = transaction_pair_df %>% group_by(pair) %>% summarise(n = n()) %>% arrange(-n) %>% ungroup
+print(transactions_by_pair_df %>% head(20))
 
-The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+total_trade_volume = sum(transactions_by_pair_df$n)
+
+# Optionally Drop out the outlier pair(311608 - 311608), n(30024)
+# Comment this line out if you want to leave it in
+transactions_by_pair_df = transactions_by_pair_df %>% filter(n < 30000)
+cat('FILTERING!\n')
+
+
+# Filtering and scaling the data in different ways.
+pairdf = transactions_by_pair_df %>% head(100)
+pairdf$row_id <- as.numeric(row.names(pairdf))
+pairdf$n_scaled <- (pairdf$n - min(pairdf$n) + 0.001) / (max(pairdf$n) - min(pairdf$n) + 0.002)
+# Reverse it so it goes up and right
+# pairdf$n_scaled <- rev(pairdf$n_scaled)
+# normalize by total_trade_volume
+pairdf$n_norm = pairdf$n / total_trade_volume
+```
+```{r}
+as.data.frame(pairdf)
+keeps <- c("n_scaled", "n", "row_id")
+clean_data <- as.data.frame(pairdf)[keeps]
+
+
+fit.lnorm.pairdf = fitdistr(clean_data$n, densfun='lognormal')
+fit.exp.pairdf = fitdistr(clean_data$n, densfun='exponential')
+fit.geom.pairdf = fitdistr(clean_data$n, densfun='geometric')
+# fit.weibull.pairdf = fitdistr(clean_data$n, densfun='weibull', start=list(shape=1, scale=500))
+# print(fit.weibull.pairdf$estimate[1])
+print(fit.lnorm.pairdf$estimate[1])
+print(fit.exp.pairdf$estimate[1])
+print(fit.geom.pairdf$estimate[1])
+```
+
+```{r}
+pair_bar = ggplot(clean_data) +
+  # scale_y_continuous(trans = 'log10') +
+  # ylim(0, 8) +
+  # xlim(0, 1) +
+  
+  geom_histogram(mapping = aes(x = n), stat = "density", fill="steelblue")   +
+  
+  
+  stat_function( fun = "dlnorm",
+                 args = list(meanlog = fit.lnorm.pairdf$estimate[1], sdlog = fit.lnorm.pairdf$estimate[2]),
+                 n = 100,
+                 size = 1,
+                 color = "red") +
+  
+  
+  stat_function(fun = "dexp",
+                size = 1,
+                args = list(rate = fit.exp.pairdf$estimate[1]),
+                color = "green") +
+  
+  # stat_function(fun = "dgeom",
+  #               size = 1,
+  #               args = list(prob = fit.geom.pairdf$estimate[1]),
+  #               color = "blue") +
+  
+  # stat_function(fun = "dweibull",
+  #               size = 1,
+  #               args = list(shape = fit.weibull.pairdf$estimate[1], scale=fit.weibull.pairdf$estimate[2]),
+  #               color = "orange") +
+  
+  
+  theme_minimal()
+
+# Can do this later...
+# list(mean = fit$estimate[1], sd = fit$estimate[2])) 
+
+print(pair_bar)
+```
+
