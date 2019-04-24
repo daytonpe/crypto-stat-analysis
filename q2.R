@@ -1,0 +1,99 @@
+# CS6313: Statistial Methods for Data Science -S19
+# Pat Dayton and AJ Rahendran
+
+# This question is similar to the first question. 
+# You will find the most active buyers and sellers 
+# in each of your three token network, and track them 
+# in other tokens. Develop a regression model where “buys” 
+# of the top K buyers (by number of buys or amount of buys) 
+# are regressors, and token price is the outcome. Determine a 
+# K value to have the best regression results. This means that 
+# you will develop three regression models for three tokens, 
+# and K can be different for each model.
+
+# TODO: switch to a list
+# install.packages("plyr")
+# install.packages("readr")
+# install.packages("ggplot2")
+# install.packages("dply")
+# install.packages("fitdistrplus")
+# install.packages("anytime")
+# install.packages("data.table")
+library(plyr)
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(fitdistrplus)
+library(anytime)
+library(data.table)
+
+setwd('/Users/daytonpe/Dropbox/utd/6316_stat_methods_for_ds_akcora/project/src')
+
+# Read and write out the first lines of the edge file
+# writeLines(readLines("./edgeFiles/omisego.txt", 2))
+
+omg_edge_df <- read_delim('./edgeFiles/omisego.txt', delim = " ", col_names = F)
+
+# Extract the data from the omisego edge file. Example:
+# 142341 75994 1524611536 5301102205520000000000
+names(omg_edge_df) <- c('fromID', 'toID', 'unixTime', 'tokenAmount')
+
+# Load in the Etherium Tokens Information
+omg_price_df = read.table("./tokenPrices/omisego.txt",
+                          col.names = c('Date',	'Open',	'High',	'Low',	'Close',	'Volume',	'MarketCap'),
+                          skip = 1,
+                          header = FALSE)
+
+# Convert date to the correct format
+omg_price_df$Date = as.Date(omg_price_df$Date,format='%m/%d/%Y')
+
+
+# Check for duplicated
+cat("Number of duplicates: ", anyDuplicated(omg_price_df), "\n")
+
+decimals = 10^18 # correct for omisego
+supply = 140245398 # correct for omisego
+K = 100
+
+# Filter out rows where the token amount is greater than the total tokenAmount
+omg_edge_df_filtered = omg_edge_df %>% filter(tokenAmount < decimals*supply)
+# cat("Num Rows before Filtering: ", nrow(omg_edge_df), "\n") # 1150737
+# cat("Num Rows after Filtering: ", nrow(omg_edge_df_filtered), "\n") # 1150726
+# cat("Num Rows cut: ", (nrow(omg_edge_df)-nrow(omg_edge_df_filtered)), "\n") # 11
+
+# Set omg_edge_df to the filtered dataframe
+omg_edge_df = omg_edge_df %>% filter(tokenAmount <= decimals * supply)
+
+# Convert the timestamp to a date 
+omg_edge_df$Date = anydate(omg_edge_df$unixTime)
+
+print(head(omg_edge_df, 3))
+
+# number of buys and sells by user id
+# Great description here: https://stackoverflow.com/questions/25869378/what-does-n-n-mean-in-r
+buys.distribution <- omg_edge_df %>% group_by(toID) %>% summarise(n = n()) %>% ungroup
+sells.distribution <- omg_edge_df %>% group_by(fromID) %>% summarise(n = n()) %>% ungroup
+
+# Filter to only include top K buyers
+top_k_buys = buys.distribution %>% arrange(-n) %>% head(K)
+edge_df_top_k <- omg_edge_df %>% filter(omg_edge_df$toID %in% top_k_buys$toID)
+
+print(min(omg_price_df$Date))
+
+print(nrow(edge_df_top_k))
+
+# Join edge data to pricing data based on Date
+# We lose a small percentage of the data here due to the fact that the timeframes for the two
+# data files do not match perfectly
+edge_df_top_k <- merge(edge_df_top_k, omg_price_df, by="Date")
+
+# Calculate previous days closes (Close_m1 = close minus 1)
+edge_df_top_k$Close_m1 <- shift(edge_df_top_k$Close, n=1)
+edge_df_top_k$Close_m2 <- shift(edge_df_top_k$Close, n=2)
+edge_df_top_k$Close_m3 <- shift(edge_df_top_k$Close, n=3)
+
+
+print(nrow(edge_df_top_k))
+print(tail(edge_df_top_k, 100))
+
+

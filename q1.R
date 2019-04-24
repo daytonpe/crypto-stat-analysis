@@ -97,7 +97,6 @@ print(buys_quant_bar)
 
 
 # Sort into sale partners per question 2
-cat("\n\nQuestion 2\n\n")
 transaction_pair_df <- omg_edge_df
 transaction_pair_df$pair = paste(as.character(transaction_pair_df$fromID),"-",as.character(transaction_pair_df$toID))
 transactions_by_pair_df = transaction_pair_df %>% group_by(pair) %>% summarise(n = n()) %>% arrange(-n) %>% ungroup
