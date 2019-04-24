@@ -197,6 +197,6 @@ pair_bar = ggplot(clean_data) +
 # list(mean = fit$estimate[1], sd = fit$estimate[2])) 
 
 print(pair_bar)
-
+# 
 
 
