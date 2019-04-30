@@ -53,7 +53,7 @@ cat("Number of duplicates: ", anyDuplicated(omg_price_df), "\n")
 
 decimals = 10^18 # correct for omisego
 supply = 140245398 # correct for omisego
-K = 100
+K = 150
 
 # Filter out rows where the token amount is greater than the total tokenAmount
 omg_edge_df_filtered = omg_edge_df %>% filter(tokenAmount < decimals*supply)
@@ -138,19 +138,19 @@ fit <- lm(
     Tot_Tok_Amt +
     Transactions +
     Distinct_Buyers +
-    Distinct_Sellers +
-    Close_m1 +
-    Close_m2 +
-    Close_m3,
+    Distinct_Sellers ,
+    # Close_m1 +
+    # Close_m2 +
+    # Close_m3,
   data=fit_data)
 
 print(summary(fit))
 print(coefficients(fit))
 
 layout(matrix(c(1,2,3,4),2,2)) # optional 4 graphs/page
-plot(fit)
+plot(fit) # Prints 4 Plots. Click through them to the right
 
-# Plot Opening Price over Time
-p = ggplot(aes(x=Open, y=Close), data = fit_data) + geom_point() 
-# + geom_smooth(method="lm") # draw linear fit line
-print(p)
+# # Plot Opening Price over Time
+# p = ggplot(aes(x=Open, y=Close), data = fit_data) + geom_point() 
+# # + geom_smooth(method="lm") # draw linear fit line
+# print(p)
