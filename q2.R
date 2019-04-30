@@ -74,26 +74,83 @@ print(head(omg_edge_df, 3))
 buys.distribution <- omg_edge_df %>% group_by(toID) %>% summarise(n = n()) %>% ungroup
 sells.distribution <- omg_edge_df %>% group_by(fromID) %>% summarise(n = n()) %>% ungroup
 
+
+
+
+
+
+
+# FEATURE ENGINEERING!
+# TODO: Group by the day so we only have ~2years of data DONE
+# TODO: Add the volume on each day DONE
+# TODO: Add the number of transactions each day DONE
+# TODO: Add average token amount DONE
+# TODO: Unique buyers each day (in top K) DONE
+
+
 # Filter to only include top K buyers
 top_k_buys = buys.distribution %>% arrange(-n) %>% head(K)
 edge_df_top_k <- omg_edge_df %>% filter(omg_edge_df$toID %in% top_k_buys$toID)
 
-print(min(omg_price_df$Date))
-
-print(nrow(edge_df_top_k))
+# Create a dataframe with summarized data for fitting a regression model
+fit_data <- edge_df_top_k %>% group_by(Date) %>% 
+  summarise(
+    Avg_Tok_Amt = mean(tokenAmount),
+    Tot_Tok_Amt = sum(tokenAmount),
+    Transactions = n(), 
+    Distinct_Buyers = n_distinct(toID),
+    Distinct_Sellers = n_distinct(fromID)
+  ) %>% 
+  ungroup
 
 # Join edge data to pricing data based on Date
 # We lose a small percentage of the data here due to the fact that the timeframes for the two
 # data files do not match perfectly
-edge_df_top_k <- merge(edge_df_top_k, omg_price_df, by="Date")
+fit_data <- merge(fit_data, omg_price_df, by="Date")
 
 # Calculate previous days closes (Close_m1 = close minus 1)
-edge_df_top_k$Close_m1 <- shift(edge_df_top_k$Close, n=1)
-edge_df_top_k$Close_m2 <- shift(edge_df_top_k$Close, n=2)
-edge_df_top_k$Close_m3 <- shift(edge_df_top_k$Close, n=3)
+fit_data$Close_m1 <- shift(fit_data$Close, n=1)
+fit_data$Close_m2 <- shift(fit_data$Close, n=2)
+fit_data$Close_m3 <- shift(fit_data$Close, n=3)
 
 
-print(nrow(edge_df_top_k))
-print(tail(edge_df_top_k, 100))
 
 
+
+
+# LOOK AT CORRELATIONS
+
+cor(fit_data$Close, fit_data$Transactions)     #  0.3225312
+cor(fit_data$Close, fit_data$Tot_Tok_Amt)      # -0.2362847
+cor(fit_data$Close, fit_data$Avg_Tok_Amt)      # -0.4194703
+cor(fit_data$Close, fit_data$Distinct_Buyers)  #  0.5984479
+cor(fit_data$Close, fit_data$Distinct_Sellers) #  0.2065241
+ 
+
+
+
+# CREATE THE MODEL
+print(head(fit_data, 5))
+
+#Fit the data to a multiple linear regression model and print the summary
+fit <- lm( 
+  Close ~ Avg_Tok_Amt + 
+    Tot_Tok_Amt +
+    Transactions +
+    Distinct_Buyers +
+    Distinct_Sellers +
+    Close_m1 +
+    Close_m2 +
+    Close_m3,
+  data=fit_data)
+
+print(summary(fit))
+print(coefficients(fit))
+
+layout(matrix(c(1,2,3,4),2,2)) # optional 4 graphs/page
+plot(fit)
+
+# Plot Opening Price over Time
+p = ggplot(aes(x=Open, y=Close), data = fit_data) + geom_point() 
+# + geom_smooth(method="lm") # draw linear fit line
+print(p)
