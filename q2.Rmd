@@ -1,12 +1,18 @@
 ---
 title: "Statistics Project -- Part 2"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
 ---
 
+
+## Initial Setup
 Set up our necessary packages. Uncomment the install.packages line the first time you run through this. 
 Set your home directory to be the src root of this project. You'll need to change this before you get started.
-```{r}
-# install.packages(c("plyr", "readr", "ggplot2", "dply", "fitdistrplus", "anytime", "data.table"))
+```{r message = FALSE}
+# install.packages(c("plyr", "readr", "ggplot2", "dply", "fitdistrplus", "anytime", "data.table", "knitr", "tinytex"))
 library(plyr)
 library(readr)
 library(ggplot2)
@@ -14,13 +20,14 @@ library(dplyr)
 library(fitdistrplus)
 library(anytime)
 library(data.table)
+library(knitr)
 
 setwd('/Users/daytonpe/Dropbox/utd/6316_stat_methods_for_ds_akcora/project/src')
 ```
 
-
+## Load Data
 Load in all of our data. The modulo of the sum of our UTD IDs was 2, so we will be using Tronix, Omisego, and YoCoin for our analysis.
-```{r}
+```{r message = FALSE}
 # First our price files
 omg_price_df = read.table("./tokenPrices/omisego.txt",
                  col.names = c('Date',	'Open',	'High',	'Low',	'Close',	'Volume',	'MarketCap'),
@@ -49,34 +56,44 @@ names(trn_edge_df) <- c('fromID', 'toID', 'unixTime', 'tokenAmount')
 names(yoc_edge_df) <- c('fromID', 'toID', 'unixTime', 'tokenAmount')
 ```
 
-
+## Prepare the Data
+### Remove Duplicates
 Check for duplicated values in all of our files and remove them.
+
+
+#### OMG
 ```{r}
-cat("Before Duplicates removed\n")
-cat("omg_price_df duplicates: ", anyDuplicated(omg_price_df), "\n")
-cat("trn_price_df duplicates: ", anyDuplicated(trn_price_df), "\n")
-cat("yoc_price_df duplicates: ", anyDuplicated(yoc_price_df), "\n")
-cat("omg_edge_df  duplicates: ", anyDuplicated(omg_price_df), "\n")
-cat("trn_edge_df  duplicates: ", anyDuplicated(trn_edge_df),  "\n")
-cat("yoc_edge_df  duplicates: ", anyDuplicated(yoc_edge_df),  "\n")
-
+cat("omg_price_df duplicates: ", anyDuplicated(omg_price_df), "  \n")
+cat("omg_edge_df  duplicates: ", anyDuplicated(omg_price_df), "  \n")
 omg_price_df <- omg_price_df %>% distinct()
-trn_price_df <- trn_price_df %>% distinct()
-yoc_price_df <- yoc_price_df %>% distinct()
 omg_edge_df  <- omg_edge_df  %>% distinct()
-trn_edge_df  <- trn_edge_df  %>% distinct()
-yoc_edge_df  <- yoc_edge_df  %>% distinct()
-
-cat("\n\nAfter Duplicates Removed\n")
-cat("omg_price_df duplicates: ", anyDuplicated(omg_price_df), "\n")
-cat("trn_price_df duplicates: ", anyDuplicated(trn_price_df), "\n")
-cat("yoc_price_df duplicates: ", anyDuplicated(yoc_price_df), "\n")
-cat("omg_edge_df  duplicates: ", anyDuplicated(omg_edge_df), "\n")
-cat("trn_edge_df  duplicates: ", anyDuplicated(trn_edge_df),  "\n")
-cat("yoc_edge_df  duplicates: ", anyDuplicated(yoc_edge_df),  "\n")
+cat("omg_edge_df  duplicates: ", anyDuplicated(omg_edge_df),  "  \n") # after duplicates removed
+cat("omg_price_df duplicates: ", anyDuplicated(omg_price_df), "  \n") # after duplicates removed
 ```
 
 
+#### TRX
+```{r}
+cat("trn_price_df duplicates: ", anyDuplicated(trn_price_df), "  \n")
+cat("trn_edge_df  duplicates: ", anyDuplicated(trn_edge_df),  "  \n")
+trn_price_df <- trn_price_df %>% distinct()
+trn_edge_df  <- trn_edge_df  %>% distinct()
+cat("trn_price_df duplicates: ", anyDuplicated(trn_price_df), "  \n") # after duplicates removed
+cat("trn_edge_df  duplicates: ", anyDuplicated(trn_edge_df),  "  \n") # after duplicates removed
+```
+
+
+#### YOC
+```{r}
+cat("yoc_price_df duplicates: ", anyDuplicated(yoc_price_df), "  \n")
+cat("yoc_edge_df  duplicates: ", anyDuplicated(yoc_edge_df),  "  \n")
+yoc_price_df <- yoc_price_df %>% distinct()
+yoc_edge_df  <- yoc_edge_df  %>% distinct()
+cat("yoc_price_df duplicates: ", anyDuplicated(yoc_price_df), "  \n") # after duplicates removed
+cat("yoc_edge_df  duplicates: ", anyDuplicated(yoc_edge_df),  "  \n") # after duplicates removed
+```
+
+### Reformat Price File Dates
 Convert the date to the correct format in the price data frames.
 ```{r}
 omg_price_df$Date = as.Date(omg_price_df$Date,format='%m/%d/%Y')
@@ -86,7 +103,7 @@ yoc_price_df$Date = as.Date(yoc_price_df$Date,format='%m/%d/%y')
 ```
 
 
-
+### Filter Impossibly Large Transactions
 Set our constants for each coin, then remove edge file rows where token amount is too big to make sense. 
 Note: Only YOC had records needing to be removed.
 ```{r}
@@ -98,22 +115,11 @@ yoc_decimals = 10^16
 omg_supply = 140245398
 trn_supply = 66682072191
 yoc_supply = 369659255
+```
 
-yocoin_edge_df_filtered = yoc_edge_df %>% filter(yoc_edge_df$tokenAmount < yoc_decimals * yoc_supply)
-cat("OMG\n")
-cat("Num Rows before Filtering: ", nrow(yoc_edge_df), "\n")
-cat("Num Rows after Filtering: ", nrow(yocoin_edge_df_filtered), "\n")
-cat("Num Rows cut: ", (nrow(yoc_edge_df)-nrow(yocoin_edge_df_filtered)), "\n")
-yoc_edge_df = yoc_edge_df %>% filter(tokenAmount <= yoc_decimals * yoc_supply)
 
-tron_edge_df_filtered = trn_edge_df %>% filter(tokenAmount < trn_decimals*trn_supply)
-cat("\n\nTRX\n")
-cat("Num Rows before Filtering: ", nrow(trn_edge_df), "\n")
-cat("Num Rows after Filtering: ", nrow(tron_edge_df_filtered), "\n")
-cat("Num Rows cut: ", (nrow(trn_edge_df)-nrow(tron_edge_df_filtered)), "\n")
-trn_edge_df = trn_edge_df %>% filter(tokenAmount <= trn_decimals * trn_supply)
-
-cat("\n\nYOC\n")
+#### OMG
+```{r}
 omg_edge_df_filtered = omg_edge_df %>% filter(tokenAmount < omg_decimals * omg_supply)
 cat("Num Rows before Filtering: ", nrow(omg_edge_df), "\n")
 cat("Num Rows after Filtering: ", nrow(omg_edge_df_filtered), "\n")
@@ -122,6 +128,27 @@ omg_edge_df = omg_edge_df %>% filter(tokenAmount <= omg_decimals * omg_supply)
 ```
 
 
+#### TRN
+```{r}
+tron_edge_df_filtered = trn_edge_df %>% filter(tokenAmount < trn_decimals*trn_supply)
+cat("Num Rows before Filtering: ", nrow(trn_edge_df), "\n")
+cat("Num Rows after Filtering: ", nrow(tron_edge_df_filtered), "\n")
+cat("Num Rows cut: ", (nrow(trn_edge_df)-nrow(tron_edge_df_filtered)), "\n")
+trn_edge_df = trn_edge_df %>% filter(tokenAmount <= trn_decimals * trn_supply)
+
+```
+
+
+#### YOC
+```{r}
+yocoin_edge_df_filtered = yoc_edge_df %>% filter(yoc_edge_df$tokenAmount < yoc_decimals * yoc_supply)
+cat("Num Rows before Filtering: ", nrow(yoc_edge_df), "\n")
+cat("Num Rows after Filtering: ", nrow(yocoin_edge_df_filtered), "\n")
+cat("Num Rows cut: ", (nrow(yoc_edge_df)-nrow(yocoin_edge_df_filtered)), "\n")
+yoc_edge_df = yoc_edge_df %>% filter(tokenAmount <= yoc_decimals * yoc_supply)
+```
+
+### Reformat Edge File Dates
 Update the edge data frame dates to be the correct format.
 ```{r}
 omg_edge_df$Date = anydate(omg_edge_df$unixTime)
@@ -129,7 +156,10 @@ trn_edge_df$Date = anydate(trn_edge_df$unixTime)
 yoc_edge_df$Date = anydate(yoc_edge_df$unixTime)
 ```
 
+##Feature Engineering
+Determine some extrea features on which we can create our multiple linear regressions.
 
+###Determine Buys/Sells by Top Buyers/Sellers
 Calculate number of buys and sells by user_id
 Great description here: https://stackoverflow.com/questions/25869378/what-does-n-n-mean-in-r
 ```{r}
@@ -142,6 +172,8 @@ trn_sells <- trn_edge_df %>% group_by(fromID) %>% summarise(n = n()) %>% ungroup
 yoc_sells <- yoc_edge_df %>% group_by(fromID) %>% summarise(n = n()) %>% ungroup
 ```
 
+
+### Filter by Top-K Buyers and Build Features
 Filter to only include top K buyers and build a dataframe with the summarized data for fitting a regression model.
 Features we create here include:
 - Avg_Tok_Amt: Average Token Amount traded for the top-K users on the given day
@@ -152,9 +184,9 @@ Features we create here include:
 
 ```{r}
 
-K_omg = 100
-K_trn = 100
-K_yoc = 100
+K_omg = 104
+K_trn = 18000
+K_yoc = 136
 
 # Filter to only include top K buyers
 omg_buys = omg_buys %>% arrange(-n) %>% head(K_omg)
@@ -199,7 +231,7 @@ yoc_fit_data <- yoc_top_k_buys %>% group_by(Date) %>%
 
 ```
 
-
+### Join Tables
 Join edge data to pricing data based on the Date. 
 We lose a small percentage of the data here due to the fact that the timeframes for the two data files do not match perfectly.
 ```{r}
@@ -208,7 +240,7 @@ trn_fit_data <- merge(trn_fit_data, trn_price_df, by="Date")
 yoc_fit_data <- merge(yoc_fit_data, yoc_price_df, by="Date")
 ```
 
-
+### Add Historic Data to Data Frame
 Calculate the close values of the previous 3 days.
 Note: m1 refers to minus 1, i.e. one day previous
 ```{r}
@@ -225,6 +257,7 @@ yoc_fit_data$Close_m2 <- shift(yoc_fit_data$Close, n=2)
 yoc_fit_data$Close_m3 <- shift(yoc_fit_data$Close, n=3)
 ```
 
+## Inspecting the Data
 Let's take a look at our data with our newly engineered features on which we will fit our multiple regression model.
 ```{r}
 omg_fit_data
@@ -241,12 +274,14 @@ cat("TRX Rows: ", nrow(trn_fit_data), "\n")
 cat("YOC Rows: ", nrow(yoc_fit_data), "\n")
 ```
 
-
+## Correlation of Regressors
 We chose to regress to the Close value of the token, so we will compare the correlation of each of the regressors (Xs) to the Close (Y).
 
 We can make the observation from this data that the previous day's prices are far more correlated to the Close price on the day when compared to the token amounts, distinct buyers, and other features we engineered. This is expected.
+
+
+#### OMG
 ```{r}
-cat("OMG\n")
 cat("Transactions:         ", cor(omg_fit_data$Close, omg_fit_data$Transactions), "\n")
 cat("Total Token Amount:  ", cor(omg_fit_data$Close, omg_fit_data$Tot_Tok_Amt), "\n")
 cat("Average Token Amount:", cor(omg_fit_data$Close, omg_fit_data$Avg_Tok_Amt), "\n")
@@ -255,9 +290,11 @@ cat("Distinct Sellers:     ", cor(omg_fit_data$Close, omg_fit_data$Distinct_Sell
 cat("Close Minus 1:        ", cor(omg_fit_data$Close, omg_fit_data$Close_m1, use = "complete.obs"), "\n")
 cat("Close Minus 2:        ", cor(omg_fit_data$Close, omg_fit_data$Close_m2, use = "complete.obs"), "\n")
 cat("Close Minus 3:        ", cor(omg_fit_data$Close, omg_fit_data$Close_m3, use = "complete.obs"), "\n")
+```
 
 
-cat("\n\nTRX\n")
+#### TRX
+```{r}
 cat("Transactions:         ", cor(trn_fit_data$Close, trn_fit_data$Transactions), "\n")
 cat("Total Token Amount:   ", cor(trn_fit_data$Close, trn_fit_data$Tot_Tok_Amt), "\n")
 cat("Average Token Amount:", cor(trn_fit_data$Close, trn_fit_data$Avg_Tok_Amt), "\n")
@@ -267,7 +304,10 @@ cat("Close Minus 1:        ", cor(trn_fit_data$Close, trn_fit_data$Close_m1, use
 cat("Close Minus 2:        ", cor(trn_fit_data$Close, trn_fit_data$Close_m2, use = "complete.obs"), "\n")
 cat("Close Minus 3:        ", cor(trn_fit_data$Close, trn_fit_data$Close_m3, use = "complete.obs"), "\n")
 
-cat("\n\nYOC\n")
+```
+
+#### YOC
+```{r}
 cat("Transactions:        ", cor(yoc_fit_data$Close, yoc_fit_data$Transactions), "\n")
 cat("Total Token Amount:  ", cor(yoc_fit_data$Close, yoc_fit_data$Tot_Tok_Amt), "\n")
 cat("Average Token Amount:", cor(yoc_fit_data$Close, yoc_fit_data$Avg_Tok_Amt), "\n")
@@ -343,42 +383,47 @@ yoc_fit_no_hist <- lm(
 
 ###OMG Summary Data and Plots for Model with Close History
 ```{r}
-cat("OMG with Close History")
 print(summary(omg_fit_hist))
 plot(omg_fit_hist)
 ```
 
 ###OMG Summary Data and Plots for Model without Close History
 ```{r}
-cat("OMG without Close History")
 print(summary(omg_fit_no_hist))
 plot(omg_fit_no_hist)
 ```
 
 ###TRX Summary Data and Plots for Model with Close History
 ```{r}
-cat("TRX with Close History")
 print(summary(trn_fit_hist))
 plot(trn_fit_hist)
 ```
 
 ###TRX Summary Data and Plots for Models without Close History
 ```{r}
-cat("TRX without Close History")
 print(summary(trn_fit_no_hist))
 plot(trn_fit_no_hist)
 ```
 
 ###YOC Summary Data and Plots for Model with Close History
 ```{r}
-cat("YOC with Close History")
 print(summary(yoc_fit_hist))
 plot(yoc_fit_hist)
 ```
 
 ###YOC Summary Data and Plots for Models without Close History
 ```{r}
-cat("YOC without Close History")
 print(summary(yoc_fit_no_hist))
 plot(yoc_fit_no_hist)
 ```
+
+
+## Conclusion
+We find that including the last three days of close prices really overpowers any gains we make via our engineered regressors. All three give us values over .95 for R^2 which is great! Unfortunately it this will not be able to predict quick spikes or drops in the price as it is simply going to estimate a linear trajectory based on the previous days' action.
+
+If we disregard the previous days' close prices, we are able to get the follwing R^2 values after [manually] experimenting with K values representing the top K buyers.
+- OMG: 0.4418 (K=104)
+- TRN: ~0.8115 (K=~18,000)
+- YOC: 0.2551 (K=135)
+
+Note that TRN's K value which produced the highest R^2 Value was exceptionally high compared to OMG and YOC. We plan to explore why this was the case in our writeup.

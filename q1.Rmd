@@ -1,0 +1,125 @@
+---
+title: "Statistics Project -- Part 1"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
+---
+
+
+## Initial Setup
+Set up our necessary packages. Uncomment the install.packages line the first time you run through this. 
+Set your home directory to be the src root of this project. You'll need to change this before you get started.
+```{r message = FALSE}
+# install.packages(c("plyr", "readr", "ggplot2", "dply", "fitdistrplus", "anytime", "data.table", "knitr", "tinytex"))
+library(plyr)
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(fitdistrplus)
+library(car)
+library(knitr)
+
+setwd('/Users/daytonpe/Dropbox/utd/6316_stat_methods_for_ds_akcora/project/src')
+```
+
+## Load Data
+Load in all of our data. The modulo of the sum of our UTD IDs was 2, so we will be using Tronix, Omisego, and YoCoin for our analysis.
+```{r message = FALSE}
+# First our price files
+omg_price_df = read.table("./tokenPrices/omisego.txt",
+                 col.names = c('Date',	'Open',	'High',	'Low',	'Close',	'Volume',	'MarketCap'),
+                 skip = 1,
+                 header = FALSE)
+
+trn_price_df = read.table("./tokenPrices/tron",
+                 col.names = c('Date',	'Open',	'High',	'Low',	'Close',	'Volume',	'MarketCap'),
+                 skip = 1,
+                 header = FALSE)
+
+yoc_price_df = read.table("./tokenPrices/yocoin",
+                 col.names = c('Date',	'Open',	'High',	'Low',	'Close',	'Volume',	'MarketCap'),
+                 skip = 1,
+                 header = FALSE)
+
+# Next our edge files
+
+omg_edge_df <- read_delim('./edgeFiles/omisego.txt', delim = " ", col_names = F)
+trn_edge_df <- read_delim('./edgeFiles/tron.txt',    delim = " ", col_names = F)
+yoc_edge_df <- read_delim('./edgeFiles/yo.txt',      delim = " ", col_names = F)
+
+# and label these as well
+names(omg_edge_df) <- c('fromID', 'toID', 'unixTime', 'tokenAmount')
+names(trn_edge_df) <- c('fromID', 'toID', 'unixTime', 'tokenAmount')
+names(yoc_edge_df) <- c('fromID', 'toID', 'unixTime', 'tokenAmount')
+```
+
+## Prepare the Data
+### Remove Duplicates
+Check for duplicated values in all of our files and remove them.
+
+
+#### OMG
+```{r}
+cat("omg_price_df duplicates: ", anyDuplicated(omg_price_df), "  \n")
+cat("omg_edge_df  duplicates: ", anyDuplicated(omg_price_df), "  \n")
+omg_price_df <- omg_price_df %>% distinct()
+omg_edge_df  <- omg_edge_df  %>% distinct()
+cat("omg_edge_df  duplicates: ", anyDuplicated(omg_edge_df),  "  \n") # after duplicates removed
+cat("omg_price_df duplicates: ", anyDuplicated(omg_price_df), "  \n") # after duplicates removed
+```
+
+
+#### TRX
+```{r}
+cat("trn_price_df duplicates: ", anyDuplicated(trn_price_df), "  \n")
+cat("trn_edge_df  duplicates: ", anyDuplicated(trn_edge_df),  "  \n")
+trn_price_df <- trn_price_df %>% distinct()
+trn_edge_df  <- trn_edge_df  %>% distinct()
+cat("trn_price_df duplicates: ", anyDuplicated(trn_price_df), "  \n") # after duplicates removed
+cat("trn_edge_df  duplicates: ", anyDuplicated(trn_edge_df),  "  \n") # after duplicates removed
+```
+
+
+#### YOC
+```{r}
+cat("yoc_price_df duplicates: ", anyDuplicated(yoc_price_df), "  \n")
+cat("yoc_edge_df  duplicates: ", anyDuplicated(yoc_edge_df),  "  \n")
+yoc_price_df <- yoc_price_df %>% distinct()
+yoc_edge_df  <- yoc_edge_df  %>% distinct()
+cat("yoc_price_df duplicates: ", anyDuplicated(yoc_price_df), "  \n") # after duplicates removed
+cat("yoc_edge_df  duplicates: ", anyDuplicated(yoc_edge_df),  "  \n") # after duplicates removed
+```
+
+## Reformat Price File Dates
+Convert the date to the correct format in the price data frames.
+```{r}
+omg_price_df$Date = as.Date(omg_price_df$Date,format='%m/%d/%Y')
+trn_price_df$Date = as.Date(trn_price_df$Date,format='%m/%d/%y')
+yoc_price_df$Date = as.Date(yoc_price_df$Date,format='%m/%d/%y')
+
+```
+
+
+## Plot Price vs. Time
+```{r}
+yoc_price_df$Date = as.Date(yoc_price_df$Date,format='%m/%d/%Y')
+trn_price_df$Date = as.Date(trn_price_df$Date,format='%m/%d/%Y')
+omg_price_df$Date = as.Date(omg_price_df$Date,format='%m/%d/%Y')
+
+yocoin_plot <- ggplot(aes(x=Date, y=Open), data = yoc_price_df) + geom_point(color="darkblue")
+
+yocoin_plot + ggtitle("YOC Historical Data") +
+  xlab("Date") + ylab("Opening Price")
+
+tron_plot <- ggplot(aes(x=Date, y=Open), data = trn_price_df) + geom_point(color="darkred")
+
+tron_plot + ggtitle("TRX Historical Data") +
+  xlab("Date") + ylab("Opening Price")
+
+omg_plot <- ggplot(aes(x=Date, y=Open), data = omg_price_df) + geom_point(color="green")
+
+omg_plot + ggtitle("OMG Historical Data") +
+  xlab("Date") + ylab("Opening Price")
+```
