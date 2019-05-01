@@ -3,118 +3,210 @@ title: "Statistics Project"
 output: html_notebook
 ---
 
-This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+This is the Analysis of buyers and sellers of the Etheruem coins Tronix (TRX), OmiseGO (OMG) and YoCoin (YOC). We will be looking at transaction data for these markets and trying to make assumptions about future data.
 
-Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+Load the libraries and set the working directory.
 
-
-
-
-Load particular libraries and csv files of coin price and transactions.
 ```{r}
 library(plyr)
 library(readr)
 library(ggplot2)
 library(dplyr)
 library(fitdistrplus)
-
-#set working directory to project folder
+library(car)
 
 setwd('C:/Users/Adharsh/Documents/2019_Spring/Statistics/R Project')
+```
 
-#read in text file of Tron token historical data
+This section is loading each tokens historical data into separate data frames. After loading the dataframes, we plot the opening price against the date. A part of the preprocessing was to adjust the date format that was provided. 
+
+```{r}
+yocoin_price_df = read.table("yocoin",
+                 col.names = c('Date',	'Open',	'High',	'Low',	'Close',	'Volume',	'MarketCap'),
+                 skip = 1,
+                 header = FALSE)
+
 tron_price_df = read.table("tron",
                           col.names = c('Date',	'Open',	'High',	'Low',	'Close',	'Volume',	'MarketCap'),
                           skip = 1,
                           header = FALSE)
 
-#display summary of results
-#summary(tron)
+omg_price_df = read.table("OMISEGO",
+                 col.names = c('Date',	'Open',	'High',	'Low',	'Close',	'Volume',	'MarketCap'),
+                 skip = 1,
+                 header = FALSE)
 
-cat("Number of duplicates: ", anyDuplicated(tron_price_df), "\n")
+print("Number of duplicates: ", anyDuplicated(yocoin_price_df))
+
+print("Number of duplicates: ", anyDuplicated(tron_price_df))
+
+print("Number of duplicates: ", anyDuplicated(omg_price_df))
+
+
+yocoin_price_df$Date = as.Date(yocoin_price_df$Date,format='%m/%d/%Y')
 
 tron_price_df$Date = as.Date(tron_price_df$Date,format='%m/%d/%Y')
 
-message("Number of rows in tron transactions data: ", nrow(tron))
+omg_price_df$Date = as.Date(omg_price_df$Date,format='%m/%d/%Y')
+
+yocoin_plot <- ggplot(aes(x=Date, y=Open), data = yocoin_price_df) + geom_point(color="darkblue")
+
+yocoin_plot + ggtitle("YOC Historical Data") +
+  xlab("Date") + ylab("Opening Price")
+
+tron_plot <- ggplot(aes(x=Date, y=Open), data = tron_price_df) + geom_point(color="darkred")
+
+tron_plot + ggtitle("TRX Historical Data") +
+  xlab("Date") + ylab("Opening Price")
+
+omg_plot <- ggplot(aes(x=Date, y=Open), data = omg_price_df) + geom_point(color="green")
+
+omg_plot + ggtitle("OMG Historical Data") +
+  xlab("Date") + ylab("Opening Price")
+```
+
+Here we load the recent transaction data for each of coins. We only need to specify the column names for the yo coin file because the file format did not include column names.
+
+```{r}
+yocoin_edge_df <- read_delim('yo.txt', delim = " ", col_names = F)
+
+names(yocoin_edge_df) <- c('fromID', 'toID', 'unixTime', 'tokenAmount')
 
 tron_edge_df <- read.csv(file = "tronixTransactions.csv", header = T)
-names(tron_edge_df) <- c('unixTime', 'fromID', 'toID', 'tokenAmount')
-#summary(tronTransactions)
 
-message("Number of rows in tron data: ", nrow(tronTransactions))
+omg_edge_df <- read.csv(file = "omgTransactions.csv", header = T)
 ```
-Find any transactions where the quantity exceeds the circulating supply.
-After calculating there are no such records.
-```{r}
-decimals <- 10^6
-circulating_supply <- 66682072191
 
-tron_edge_df_filtered = tron_edge_df %>% filter(tokenAmount < decimals*circulating_supply)
+
+This step is a small portion of processing where we find any transactions where the quantity exceeds the circulating supply.
+
+From these calculations, only YOC had records that needed to be removed.
+```{r}
+yocoin_decimals = 10^16 
+yocoin_supply = 369659255
+
+yocoin_edge_df_filtered = yocoin_edge_df %>% filter(tokenAmount < yocoin_decimals * yocoin_supply)
+cat("Num Rows before Filtering: ", nrow(yocoin_edge_df), "\n")
+cat("Num Rows after Filtering: ", nrow(yocoin_edge_df_filtered), "\n")
+cat("Num Rows cut: ", (nrow(yocoin_edge_df)-nrow(yocoin_edge_df_filtered)), "\n")
+
+yocoin_edge_df = yocoin_edge_df %>% filter(tokenAmount <= yocoin_decimals * yocoin_supply)
+
+tron_decimals <- 10^6
+tron_circulating_supply <- 66682072191
+
+tron_edge_df_filtered = tron_edge_df %>% filter(tokenAmount < tron_decimals*tron_circulating_supply)
 cat("Num Rows before Filtering: ", nrow(tron_edge_df), "\n")
 cat("Num Rows after Filtering: ", nrow(tron_edge_df_filtered), "\n")
 cat("Num Rows cut: ", (nrow(tron_edge_df)-nrow(tron_edge_df_filtered)), "\n")
 
+tron_edge_df = tron_edge_df %>% filter(tokenAmount <= tron_decimals * tron_circulating_supply)
+
+omg_decimals = 10^18 # correct for omisego
+omg_supply = 140245398 # correct for omisego
+
+# Filter out rows where the token amount is greater than the total tokenAmount
+omg_edge_df_filtered = omg_edge_df %>% filter(tokenAmount < omg_decimals * omg_supply)
+cat("Num Rows before Filtering: ", nrow(omg_edge_df), "\n")
+cat("Num Rows after Filtering: ", nrow(omg_edge_df_filtered), "\n")
+cat("Num Rows cut: ", (nrow(omg_edge_df)-nrow(omg_edge_df_filtered)), "\n")
+
+# Set omg_edge_df to the filtered dataframe
+omg_edge_df = omg_edge_df %>% filter(tokenAmount <= omg_decimals * omg_supply)
+
 ```
 
-Preprocess the data
+For the sake of basic analysis, we create a value in the dataframe for pairs of buyers and sellers. 
+
 ```{r}
-tron_edge_df = tron_edge_df %>% filter(tokenAmount <= decimals * circulating_supply)
+yocoin_edge_df$pairFrom <- paste(yocoin_edge_df$fromID, '-', yocoin_edge_df$toID)
+yocoin_edge_df$pairTo <- paste(yocoin_edge_df$toID, '-', yocoin_edge_df$fromID)
+yocoin_pairFrom_counts <- as.data.frame(table(yocoin_edge_df$pairFrom))
+yocoin_pairTo_counts <- as.data.frame(table(yocoin_edge_df$pairTo))
+names(yocoin_pairFrom_counts) <- c('Pair', 'Transactions')
+names(yocoin_pairTo_counts) <- c('Pair', 'Transactions')
+yocoin_pairFrom_counts <- head(yocoin_pairFrom_counts, n = 100)
+yocoin_pairTo_counts <- head(yocoin_pairTo_counts, n = 100)
+
+tron_edge_df$pairFrom <- paste(tron_edge_df$fromID, '-', tron_edge_df$toID)
+tron_edge_df$pairTo <- paste(tron_edge_df$toID, '-', tron_edge_df$fromID)
+tron_pairFrom_counts <- as.data.frame(table(tron_edge_df$pairFrom))
+tron_pairTo_counts <- as.data.frame(table(tron_edge_df$pairTo))
+names(tron_pairFrom_counts) <- c('Pair', 'Transactions')
+names(tron_pairTo_counts) <- c('Pair', 'Transactions')
+tron_pairFrom_counts <- head(tron_pairFrom_counts, n = 100)
+tron_pairTo_counts <- head(tron_pairTo_counts, n = 100)
+
+omg_edge_df$pairFrom <- paste(omg_edge_df$fromID, '-', omg_edge_df$toID)
+omg_edge_df$pairTo <- paste(omg_edge_df$toID, '-', omg_edge_df$fromID)
+omg_pairFrom_counts <- as.data.frame(table(yocoin_edge_df$pairFrom))
+omg_pairTo_counts <- as.data.frame(table(yocoin_edge_df$pairTo))
+names(omg_pairFrom_counts) <- c('Pair', 'Transactions')
+names(omg_pairTo_counts) <- c('Pair', 'Transactions')
+omg_pairFrom_counts <- head(omg_pairFrom_counts, n = 100)
+omg_pairTo_counts <- head(omg_pairTo_counts, n = 100)
+```
+
+In this section we plot the Number of Transactions against the pair of buyer and seller. This is just help us understand the distribution of transactions between user pairs. There are two graphs for each coin, respectiv to buyer and seller data.
+
+```{r}
+yocoin_plot_transFrom <- ggplot(aes(x=Pair, y=Transactions), data = yocoin_pairFrom_counts) + geom_bar(stat = "identity", color="darkblue") + 
+geom_text(aes(label = Transactions))
+
+yocoin_plot_transFrom + ggtitle("YOC Transaction Data") + xlab("Buyer and Seller Pair") + ylab("Number of Transactions")
+
+yocoin_plot_transTo <- ggplot(aes(x=Pair, y=Transactions), data = yocoin_pairTo_counts) + geom_bar(stat = "identity", color="darkblue") + geom_text(aes(label = Transactions))
+
+yocoin_plot_transTo + ggtitle("YOC Transaction Data") + xlab("Buyer and Seller Pair") + ylab("Number of Transactions")
+
+tron_plot_transFrom <- ggplot(aes(x=Pair, y=Transactions), data = tron_pairFrom_counts) + geom_bar(stat = "identity", color="darkred") + geom_text(aes(label=Transactions))
+
+tron_plot_transFrom + ggtitle("TRX Transaction Data") +  xlab("Buyer and Seller Pair") + ylab("Token Amount")
+
+tron_plot_transTo <- ggplot(aes(x=Pair, y=Transactions), data = tron_pairTo_counts) + geom_bar(stat = "identity", color="darkred") + geom_text(aes(label=Transactions))
+
+tron_plot_transTo + ggtitle("TRX Transaction Data") +  xlab("Buyer and Seller Pair") + ylab("Token Amount")
+
+omg_plot_transFrom <- ggplot(aes(x=Pair, y=Transactions), data = omg_pairFrom_counts) + geom_bar(stat = "identity", color="green") + geom_text(aes(label=Transactions))
+
+omg_plot_transFrom + ggtitle("OMG Transaction Data") +  xlab("Buyer and Seller Pair") + ylab("Token Amount")
+
+omg_plot_transTo <- ggplot(aes(x=Pair, y=Transactions), data = omg_pairTo_counts) + geom_bar(stat = "identity", color="green") + geom_text(aes(label=Transactions))
+
+omg_plot_transTo + ggtitle("OMG Transaction Data") +  xlab("Buyer and Seller Pair") + ylab("Token Amount")
 ```
 
 
-Find the distribution number of transactions between the same buyers and sellers
+In this section we take the the same data from above and take into a narrower scope, only 20 of the top transactions. From this we begin calculating the distributions of the transaction data.
 ```{r}
-buys.distribution <- tron_edge_df %>% group_by(toID) %>% summarise(n = n()) %>% ungroup
+tron_buys.distribution <- tron_edge_df %>% group_by(toID) %>% summarise(n = n()) %>% ungroup
 sells.distribution <- tron_edge_df %>% group_by(fromID) %>% summarise(n = n()) %>% ungroup
-# buyers <- c(tron_processed$Buyer)
-# sellers <- c(tron_processed$Seller)
-# amount <- c(tron_processed$Amount)
-# 
-# plot(amount~buyers)
-# 
-# plot(amount~sellers)
-# 
-# plot(buyers~sellers)
 
 cat("Buys Top 20")
-print(buys.distribution %>% arrange(-n) %>% head(20))
+print(tron_buys.distribution %>% arrange(-n) %>% head(20))
 
 cat("Sells Top 20")
 print(sells.distribution %>% arrange(-n) %>% head(20))
 
-#print(buyers)
-
-#buyers_dist <- tron_processed %>% group_by(Buyer) %>% summarise(n =n()) %>% ungroup
-
-#sellers_dist <- tron_processed %>% group_by(Seller) %>% summarise(n =n()) %>% ungroup
-
-#ggplot(buyers_dist, aes_(x=0, y=1)) + geom_bar(stat='identity')
-#buyers_table <- as.data.frame(buyers)
-#buyers_table <- unique(buyers_table)
-#View(unique(buyers_table))
-
-#plot(buyers_table~)
-
-#buyer_freq <- (as.data.frame(table(buyers_table[,'Freq'])))
 ```
 
 ```{r}
-selldf = sells.distribution %>% arrange(-n) %>% head(20)
-selldf$row_id <- as.numeric(row.names(selldf))
-sells_quant_bar = ggplot(data=selldf, aes(x=row_id, y=n)) +
+tron_selldf = tron_sells.distribution %>% arrange(-n) %>% head(20)
+tron_selldf$row_id <- as.numeric(row.names(selldf))
+tron_sells_quant_bar = ggplot(data=selldf, aes(x=row_id, y=n)) +
   geom_bar(stat="identity", fill="steelblue")+
   geom_text(aes(label=n), vjust=-0.3, size=3.5)+
   theme_minimal()
-print(sells_quant_bar)
+print(tron_sells_quant_bar)
 
 # Create a bar chart to plot the top 20 sellers by their total tokens sold.
-buydf = buys.distribution %>% arrange(-n) %>% head(20)
-buydf$row_id <- as.numeric(row.names(buydf))
-buys_quant_bar = ggplot(data=buydf, aes(x=row_id, y=n)) +
+tron_buydf = tron_buys.distribution %>% arrange(-n) %>% head(20)
+tron_buydf$row_id <- as.numeric(row.names(buydf))
+tron_buys_quant_bar = ggplot(data=buydf, aes(x=row_id, y=n)) +
   geom_bar(stat="identity", fill="steelblue")+
   geom_text(aes(label=n), vjust=-0.3, size=3.5)+
   theme_minimal()
-print(buys_quant_bar)
+print(tron_buys_quant_bar)
 ```
 Start of Question 2, getting the pairs of buyers and sellers
 ```{r}
