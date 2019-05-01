@@ -1,5 +1,5 @@
 ---
-title: "Statistics Project -- Part 2"
+title: "CS6313 - Statistics Project"
 output:
   html_document:
     df_print: paged
@@ -7,11 +7,13 @@ output:
   pdf_document: default
 ---
 
+## Pat Dayton
+## AJ Rahendran
 
 ## Initial Setup
 Set up our necessary packages. Uncomment the install.packages line the first time you run through this. 
 Set your home directory to be the src root of this project. You'll need to change this before you get started.
-```{r message = FALSE}
+```{r include = FALSE}
 # install.packages(c("plyr", "readr", "ggplot2", "dply", "fitdistrplus", "anytime", "data.table", "knitr", "tinytex"))
 library(plyr)
 library(readr)
@@ -130,10 +132,10 @@ omg_edge_df = omg_edge_df %>% filter(tokenAmount <= omg_decimals * omg_supply)
 
 #### TRN
 ```{r}
-tron_edge_df_filtered = trn_edge_df %>% filter(tokenAmount < trn_decimals*trn_supply)
+trn_edge_df_filtered = trn_edge_df %>% filter(tokenAmount < trn_decimals*trn_supply)
 cat("Num Rows before Filtering: ", nrow(trn_edge_df), "\n")
-cat("Num Rows after Filtering: ", nrow(tron_edge_df_filtered), "\n")
-cat("Num Rows cut: ", (nrow(trn_edge_df)-nrow(tron_edge_df_filtered)), "\n")
+cat("Num Rows after Filtering: ", nrow(trn_edge_df_filtered), "\n")
+cat("Num Rows cut: ", (nrow(trn_edge_df)-nrow(trn_edge_df_filtered)), "\n")
 trn_edge_df = trn_edge_df %>% filter(tokenAmount <= trn_decimals * trn_supply)
 
 ```
@@ -141,10 +143,10 @@ trn_edge_df = trn_edge_df %>% filter(tokenAmount <= trn_decimals * trn_supply)
 
 #### YOC
 ```{r}
-yocoin_edge_df_filtered = yoc_edge_df %>% filter(yoc_edge_df$tokenAmount < yoc_decimals * yoc_supply)
+yoc_edge_df_filtered = yoc_edge_df %>% filter(yoc_edge_df$tokenAmount < yoc_decimals * yoc_supply)
 cat("Num Rows before Filtering: ", nrow(yoc_edge_df), "\n")
-cat("Num Rows after Filtering: ", nrow(yocoin_edge_df_filtered), "\n")
-cat("Num Rows cut: ", (nrow(yoc_edge_df)-nrow(yocoin_edge_df_filtered)), "\n")
+cat("Num Rows after Filtering: ", nrow(yoc_edge_df_filtered), "\n")
+cat("Num Rows cut: ", (nrow(yoc_edge_df)-nrow(yoc_edge_df_filtered)), "\n")
 yoc_edge_df = yoc_edge_df %>% filter(tokenAmount <= yoc_decimals * yoc_supply)
 ```
 
@@ -185,7 +187,7 @@ omg_plot + ggtitle("OMG Historical Data") +
 ## Feature Engineering
 ### Create Transaction Pair Data Field
 For the sake of basic analysis, we create a value in the dataframe for pairs of buyers and sellers. 
-```{r}
+```{r warning = FALSE}
 yoc_edge_df$pairFrom <- paste(yoc_edge_df$fromID, '-', yoc_edge_df$toID)
 yoc_edge_df$pairTo <- paste(yoc_edge_df$toID, '-', yoc_edge_df$fromID)
 yocoin_pairFrom_counts <- as.data.frame(table(yoc_edge_df$pairFrom))
@@ -206,8 +208,8 @@ tron_pairTo_counts <- head(tron_pairTo_counts, n = 100)
 
 omg_edge_df$pairFrom <- paste(omg_edge_df$fromID, '-', omg_edge_df$toID)
 omg_edge_df$pairTo <- paste(omg_edge_df$toID, '-', omg_edge_df$fromID)
-omg_pairFrom_counts <- as.data.frame(table(yocoin_edge_df$pairFrom))
-omg_pairTo_counts <- as.data.frame(table(yocoin_edge_df$pairTo))
+omg_pairFrom_counts <- as.data.frame(table(omg_edge_df$pairFrom))
+omg_pairTo_counts <- as.data.frame(table(omg_edge_df$pairTo))
 names(omg_pairFrom_counts) <- c('Pair', 'Transactions')
 names(omg_pairTo_counts) <- c('Pair', 'Transactions')
 omg_pairFrom_counts <- head(omg_pairFrom_counts, n = 100)
@@ -219,7 +221,7 @@ omg_pairTo_counts <- head(omg_pairTo_counts, n = 100)
 In this section we plot the Number of Transactions against the pair of buyer and seller. This is just help us understand the distribution of transactions between user pairs. There are two graphs for each coin, respectiv to buyer and seller data.
 
 #### OMG
-```{r}
+```{r warning = FALSE}
 omg_plot_transFrom <- 
   ggplot(aes(x=Pair, y=Transactions), 
   data = omg_pairFrom_counts) + 
@@ -245,7 +247,7 @@ omg_plot_transTo +
 
 
 ### TRX
-```{r}
+```{r warning = FALSE}
 tron_plot_transFrom <- 
   ggplot(aes(x=Pair, y=Transactions), 
   data = tron_pairFrom_counts) + 
@@ -272,7 +274,7 @@ tron_plot_transTo +
 
 
 ### YOC
-```{r}
+```{r warning = FALSE}
 yocoin_plot_transFrom <- 
   ggplot(aes(x=Pair, y=Transactions), 
   data = yocoin_pairFrom_counts) + 
@@ -299,12 +301,12 @@ yocoin_plot_transTo +
 
 ###Transactions vs. Buyer/Seller (Top-K only)
 In this section we take the the same data from above and take into a narrower scope, only 20 of the top transaction amounts. From this we begin calculating the distributions of the transaction data.
-```{r}
-yocoin_buys.distribution <- yocoin_edge_df %>% group_by(toID) %>% summarise(n = n()) %>% ungroup
-yocoin_sells.distribution <- yocoin_edge_df %>% group_by(fromID) %>% summarise(n = n()) %>% ungroup
+```{r warning = FALSE}
+yocoin_buys.distribution <- yoc_edge_df %>% group_by(toID) %>% summarise(n = n()) %>% ungroup
+yocoin_sells.distribution <- yoc_edge_df %>% group_by(fromID) %>% summarise(n = n()) %>% ungroup
 
-tron_buys.distribution <- tron_edge_df %>% group_by(toID) %>% summarise(n = n()) %>% ungroup
-tron_sells.distribution <- tron_edge_df %>% group_by(fromID) %>% summarise(n = n()) %>% ungroup
+tron_buys.distribution <- trn_edge_df %>% group_by(toID) %>% summarise(n = n()) %>% ungroup
+tron_sells.distribution <- trn_edge_df %>% group_by(fromID) %>% summarise(n = n()) %>% ungroup
 
 omg_buys.distribution <- omg_edge_df %>% group_by(toID) %>% summarise(n = n()) %>% ungroup
 omg_sells.distribution <- omg_edge_df %>% group_by(fromID) %>% summarise(n = n()) %>% ungroup
@@ -325,7 +327,7 @@ print(omg_sells.distribution %>% arrange(-n) %>% head(20))
 This section takes the seller and buyer distribution data, orders it by decreasing amount and finalizes the amount to 20.
 Once theses calculations are completed, we plot these data frames into respective bar charts and provide numeric values at the top of the bar.
 This data is far more useful in showing the transaction data.
-```{r}
+```{r warning = FALSE}
 yocoin_sell_df = yocoin_sells.distribution %>% arrange(-n) %>% head(20)
 yocoin_sell_df$row_id <- as.numeric(row.names(yocoin_sell_df))
 yocoin_sells_quant_bar = ggplot(data=yocoin_sell_df, aes(x=row_id, y=n)) +
@@ -379,11 +381,11 @@ print(omg_buys_quant_bar)
 
 This section is dedicated to making getting proper buying distributions (ordered and truncated to the top 20). We calculate the total volume of the transactions. After that we filter the data, apply some scaling attributes and normalize the data.
 
-```{r}
-yocoin_by_pair_df = yocoin_edge_df %>% group_by(pairFrom) %>% summarise(n = n()) %>% arrange(-n) %>% ungroup
+```{r warning = FALSE}
+yocoin_by_pair_df = yoc_edge_df %>% group_by(pairFrom) %>% summarise(n = n()) %>% arrange(-n) %>% ungroup
 print(yocoin_by_pair_df %>% head(20))
 
-tron_by_pair_df = tron_edge_df %>% group_by(pairFrom) %>% summarise(n = n()) %>% arrange(-n) %>% ungroup
+tron_by_pair_df = trn_edge_df %>% group_by(pairFrom) %>% summarise(n = n()) %>% arrange(-n) %>% ungroup
 print(yocoin_by_pair_df %>% head(20))
 
 omg_by_pair_df = omg_edge_df %>% group_by(pairFrom) %>% summarise(n = n()) %>% arrange(-n) %>% ungroup
@@ -428,7 +430,7 @@ From here we take the data, and apply some different distributions.
 - Gamma
 - Negative Binomial
 
-```{r}
+```{r warning = FALSE}
 as.data.frame(yocoin_pair_df)
 as.data.frame(tron_pair_df)
 as.data.frame(omg_pair_df)
@@ -471,7 +473,7 @@ fit.nbinomial.omg_pair_df = fitdistr(omg_clean_data$n, densfun='negative binomia
 
 This section is just to set up and show the plot for each of the coins and their processed data.
 
-```{r}
+```{r warning = FALSE}
 yocoin_pair_bar = ggplot(yocoin_clean_data) + geom_histogram(mapping = aes(x = n), stat = "density", fill="steelblue") +
   stat_function( fun = "dlnorm",
                  args = list(meanlog = fit.lnorm.yocoin_pair_df$estimate[1], sdlog = fit.lnorm.yocoin_pair_df$estimate[2]),
@@ -593,7 +595,7 @@ Determine some extrea features on which we can create our multiple linear regres
 ###Determine Buys/Sells by Top Buyers/Sellers
 Calculate number of buys and sells by user_id
 Great description here: https://stackoverflow.com/questions/25869378/what-does-n-n-mean-in-r
-```{r}
+```{r warning = FALSE}
 omg_buys  <- omg_edge_df %>% group_by(toID) %>% summarise(n = n()) %>% ungroup
 trn_buys  <- trn_edge_df %>% group_by(toID) %>% summarise(n = n()) %>% ungroup
 yoc_buys  <- yoc_edge_df %>% group_by(toID) %>% summarise(n = n()) %>% ungroup
@@ -613,7 +615,7 @@ Features we create here include:
 - Distinct Buyers: Distinct number of buyers for a given day
 - Distinct Sellers: Distinct number of sellers for a given day
 
-```{r}
+```{r warning = FALSE}
 
 K_omg = 104
 K_trn = 18000
@@ -665,7 +667,7 @@ yoc_fit_data <- yoc_top_k_buys %>% group_by(Date) %>%
 ### Join Tables
 Join edge data to pricing data based on the Date. 
 We lose a small percentage of the data here due to the fact that the timeframes for the two data files do not match perfectly.
-```{r}
+```{r warning = FALSE}
 omg_fit_data <- merge(omg_fit_data, omg_price_df, by="Date")
 trn_fit_data <- merge(trn_fit_data, trn_price_df, by="Date")
 yoc_fit_data <- merge(yoc_fit_data, yoc_price_df, by="Date")
@@ -674,7 +676,7 @@ yoc_fit_data <- merge(yoc_fit_data, yoc_price_df, by="Date")
 ### Add Historic Data to Data Frame
 Calculate the close values of the previous 3 days.
 Note: m1 refers to minus 1, i.e. one day previous
-```{r}
+```{r warning = FALSE}
 omg_fit_data$Close_m1 <- shift(omg_fit_data$Close, n=1)
 omg_fit_data$Close_m2 <- shift(omg_fit_data$Close, n=2)
 omg_fit_data$Close_m3 <- shift(omg_fit_data$Close, n=3)
@@ -690,7 +692,7 @@ yoc_fit_data$Close_m3 <- shift(yoc_fit_data$Close, n=3)
 
 ## Inspecting the Data
 Let's take a look at our data with our newly engineered features on which we will fit our multiple regression model.
-```{r}
+```{r warning = FALSE}
 omg_fit_data
 trn_fit_data
 yoc_fit_data
@@ -699,7 +701,7 @@ yoc_fit_data
 
 Let's also take a look at how many days are tracked for the three tokens in our data sets.
 We have the most data for YOC.
-```{r}
+```{r warning = FALSE}
 cat("OMG Rows: ", nrow(omg_fit_data), "\n")
 cat("TRX Rows: ", nrow(trn_fit_data), "\n")
 cat("YOC Rows: ", nrow(yoc_fit_data), "\n")
@@ -712,7 +714,7 @@ We can make the observation from this data that the previous day's prices are fa
 
 
 #### OMG
-```{r}
+```{r warning = FALSE}
 cat("Transactions:         ", cor(omg_fit_data$Close, omg_fit_data$Transactions), "\n")
 cat("Total Token Amount:  ", cor(omg_fit_data$Close, omg_fit_data$Tot_Tok_Amt), "\n")
 cat("Average Token Amount:", cor(omg_fit_data$Close, omg_fit_data$Avg_Tok_Amt), "\n")
@@ -725,7 +727,7 @@ cat("Close Minus 3:        ", cor(omg_fit_data$Close, omg_fit_data$Close_m3, use
 
 
 #### TRX
-```{r}
+```{r warning = FALSE}
 cat("Transactions:         ", cor(trn_fit_data$Close, trn_fit_data$Transactions), "\n")
 cat("Total Token Amount:   ", cor(trn_fit_data$Close, trn_fit_data$Tot_Tok_Amt), "\n")
 cat("Average Token Amount:", cor(trn_fit_data$Close, trn_fit_data$Avg_Tok_Amt), "\n")
@@ -738,7 +740,7 @@ cat("Close Minus 3:        ", cor(trn_fit_data$Close, trn_fit_data$Close_m3, use
 ```
 
 #### YOC
-```{r}
+```{r warning = FALSE}
 cat("Transactions:        ", cor(yoc_fit_data$Close, yoc_fit_data$Transactions), "\n")
 cat("Total Token Amount:  ", cor(yoc_fit_data$Close, yoc_fit_data$Tot_Tok_Amt), "\n")
 cat("Average Token Amount:", cor(yoc_fit_data$Close, yoc_fit_data$Avg_Tok_Amt), "\n")
@@ -753,7 +755,7 @@ cat("Close Minus 3:        ", cor(yoc_fit_data$Close, yoc_fit_data$Close_m3, use
 Time to actually perform the fit via multiple linear regression. We will split each coin into two different models. The first considering the previous 3 days of Close prices. The second only focusing on the features we engineered. As the previous three days were so highly correlated with the price, they make the R^2 value significantly higher and we lose some understanding of which one of the engineered features actually contributes the most. 
 
 Note: The models ending in "_hist" take the price history for the three previous days into account. Those with "_no_hist" endings do not.
-```{r}
+```{r warning = FALSE}
 omg_fit_hist <- lm(
   Close ~ Avg_Tok_Amt +
     Tot_Tok_Amt +
@@ -813,37 +815,37 @@ yoc_fit_no_hist <- lm(
 ```
 
 ###OMG Summary Data and Plots for Model with Close History
-```{r}
+```{r warning = FALSE}
 print(summary(omg_fit_hist))
 plot(omg_fit_hist)
 ```
 
 ###OMG Summary Data and Plots for Model without Close History
-```{r}
+```{r warning = FALSE}
 print(summary(omg_fit_no_hist))
 plot(omg_fit_no_hist)
 ```
 
 ###TRX Summary Data and Plots for Model with Close History
-```{r}
+```{r warning = FALSE}
 print(summary(trn_fit_hist))
 plot(trn_fit_hist)
 ```
 
 ###TRX Summary Data and Plots for Models without Close History
-```{r}
+```{r warning = FALSE}
 print(summary(trn_fit_no_hist))
 plot(trn_fit_no_hist)
 ```
 
 ###YOC Summary Data and Plots for Model with Close History
-```{r}
+```{r warning = FALSE}
 print(summary(yoc_fit_hist))
 plot(yoc_fit_hist)
 ```
 
 ###YOC Summary Data and Plots for Models without Close History
-```{r}
+```{r warning = FALSE}
 print(summary(yoc_fit_no_hist))
 plot(yoc_fit_no_hist)
 ```
