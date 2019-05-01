@@ -101,6 +101,12 @@ yoc_price_df$Date = as.Date(yoc_price_df$Date,format='%m/%d/%y')
 
 ```
 
+```{r}
+omg_price_df
+trn_price_df
+yoc_price_df
+```
+
 
 ## Plot Price vs. Time
 ```{r}
@@ -109,17 +115,17 @@ trn_price_df$Date = as.Date(trn_price_df$Date,format='%m/%d/%Y')
 omg_price_df$Date = as.Date(omg_price_df$Date,format='%m/%d/%Y')
 
 yocoin_plot <- ggplot(aes(x=Date, y=Open), data = yoc_price_df) + geom_point(color="darkblue")
-
 yocoin_plot + ggtitle("YOC Historical Data") +
   xlab("Date") + ylab("Opening Price")
 
 tron_plot <- ggplot(aes(x=Date, y=Open), data = trn_price_df) + geom_point(color="darkred")
-
 tron_plot + ggtitle("TRX Historical Data") +
   xlab("Date") + ylab("Opening Price")
 
-omg_plot <- ggplot(aes(x=Date, y=Open), data = omg_price_df) + geom_point(color="green")
-
+omg_plot <- ggplot(aes(x=Date, y=Open), data = omg_price_df) + geom_point(color="darkgreen")
 omg_plot + ggtitle("OMG Historical Data") +
   xlab("Date") + ylab("Opening Price")
 ```
+
+
+
