@@ -1,0 +1,184 @@
+---
+title: "YoCoin"
+author: "Adharsh Rajendran"
+date: "April 24, 2019"
+output: html_document
+---
+
+
+Library and working dir
+```{r}
+library(plyr)
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(fitdistrplus)
+
+setwd('C:/Users/Adharsh/Documents/2019_Spring/Statistics/R Project')
+```
+
+
+```{r}
+yocoin_price_df = read.table("./yocoin",
+                 col.names = c('Date',	'Open',	'High',	'Low',	'Close',	'Volume',	'MarketCap'),
+                 skip = 1,
+                 header = FALSE)
+
+# Check for duplicated
+cat("Number of duplicates: ", anyDuplicated(yocoin_price_df), "\n")
+
+# Convert date to the correct format
+yocoin_price_df$Date = as.Date(yocoin_price_df$Date,format='%m/%d/%Y')
+
+
+# Plot Opening Price over Time
+p = ggplot(aes(x=Date, y=Open), data = yocoin_price_df) + geom_point()
+print(p)
+
+# yocoin_edge_df <- read_delim('./edgeFiles/yocoin.txt', delim = " ", col_names = F)
+# 
+# # Extract the data from the yocoin edge file. Example:
+# # 142341 75994 1524611536 5301102205520000000000
+# names(yocoin_edge_df) <- c('fromID', 'toID', 'unixTime', 'tokenAmount')
+```
+
+
+
+```{r}
+# decimals = 10^18 # correct for yocoin
+# supply = 140245398 # correct for yocoin
+# 
+# # Filter out rows where the token amount is greater than the total tokenAmount
+# yocoin_edge_df_filtered = yocoin_edge_df %>% filter(tokenAmount < decimals*supply)
+# cat("Num Rows before Filtering: ", nrow(yocoin_edge_df), "\n")
+# cat("Num Rows after Filtering: ", nrow(yocoin_edge_df_filtered), "\n")
+# cat("Num Rows cut: ", (nrow(yocoin_edge_df)-nrow(yocoin_edge_df_filtered)), "\n")
+# 
+# # Set yocoin_edge_df to the filtered dataframe
+# yocoin_edge_df = yocoin_edge_df %>% filter(tokenAmount <= decimals * supply)
+```
+
+
+```{r}
+# buys.distribution <- yocoin_edge_df %>% group_by(toID) %>% summarise(n = n()) %>% ungroup
+# sells.distribution <- yocoin_edge_df %>% group_by(fromID) %>% summarise(n = n()) %>% ungroup
+# 
+# ## show highest 20 buyers and their number of buys 
+# cat("Buys Top 20")
+# print(buys.distribution %>% arrange(-n) %>% head(20))
+# 
+# 
+# ## show highest 20 buyers and their number of buys 
+# cat("Sells Top 20")
+# print(sells.distribution %>% arrange(-n) %>% head(20))
+# 
+# # Create a bar chart to plot the top 20 sellers by their total tokens sold.
+# selldf = sells.distribution %>% arrange(-n) %>% head(20)
+# selldf$row_id <- as.numeric(row.names(selldf))
+# sells_quant_bar = ggplot(data=selldf, aes(x=row_id, y=n)) +
+#   geom_bar(stat="identity", fill="steelblue")+
+#   geom_text(aes(label=n), vjust=-0.3, size=3.5)+
+#   theme_minimal()
+# print(sells_quant_bar)
+# 
+# # Create a bar chart to plot the top 20 sellers by their total tokens sold.
+# buydf = buys.distribution %>% arrange(-n) %>% head(20)
+# buydf$row_id <- as.numeric(row.names(buydf))
+# buys_quant_bar = ggplot(data=buydf, aes(x=row_id, y=n)) +
+#   geom_bar(stat="identity", fill="steelblue")+
+#   geom_text(aes(label=n), vjust=-0.3, size=3.5)+
+#   theme_minimal()
+# print(buys_quant_bar)
+```
+
+
+```{r}
+# transaction_pair_df <- yocoin_edge_df
+# transaction_pair_df$pair = paste(as.character(transaction_pair_df$fromID),"-",as.character(transaction_pair_df$toID))
+# transactions_by_pair_df = transaction_pair_df %>% group_by(pair) %>% summarise(n = n()) %>% arrange(-n) %>% ungroup
+# print(transactions_by_pair_df %>% head(20))
+# 
+# # Calculate Total Traded Valume (1120702)
+# total_trade_volume = sum(transactions_by_pair_df$n)
+# 
+# # Optionally Drop out the outlier pair(311608 - 311608), n(30024)
+# # Comment this line out if you want to leave it in
+# transactions_by_pair_df = transactions_by_pair_df %>% filter(n < 30000)
+# cat('FILTERING!\n')
+# 
+# 
+# # Filtering and scaling the data in different ways.
+# pairdf = transactions_by_pair_df %>% head(100)
+# pairdf$row_id <- as.numeric(row.names(pairdf))
+# pairdf$n_scaled <- (pairdf$n - min(pairdf$n) + 0.001) / (max(pairdf$n) - min(pairdf$n) + 0.002)
+# # Reverse it so it goes up and right
+# # pairdf$n_scaled <- rev(pairdf$n_scaled)
+# # normalize by total_trade_volume
+# pairdf$n_norm = pairdf$n / total_trade_volume
+```
+
+```{r}
+# as.data.frame(pairdf)
+# keeps <- c("n_scaled", "n", "row_id")
+# clean_data <- as.data.frame(pairdf)[keeps]
+# print(clean_data)
+```
+
+```{r}
+# fit.lnorm.pairdf = fitdistr(clean_data$n, densfun='lognormal')
+# fit.exp.pairdf = fitdistr(clean_data$n, densfun='exponential')
+# fit.geom.pairdf = fitdistr(clean_data$n, densfun='geometric')
+# fit.weibull.pairdf = fitdistr(clean_data$n, densfun='weibull')
+# fit.gamma.pairdf = fitdistr(clean_data$n, densfun='gamma')
+# fit.nbinomial.pairdf = fitdistr(clean_data$n, densfun='negative binomial')
+# 
+# pair_bar = ggplot(clean_data) +
+#   # scale_y_continuous(trans = 'log10') +
+#   # ylim(0, 8) +
+#   # xlim(0, 1) +
+#   
+#   geom_histogram(mapping = aes(x = n), stat = "density", fill="steelblue")   +
+#   
+#   
+#   stat_function( fun = "dlnorm",
+#                 args = list(meanlog = fit.lnorm.pairdf$estimate[1], sdlog = fit.lnorm.pairdf$estimate[2]),
+#                 n = 100,
+#                 size = 1,
+#                 color = "red") +
+# 
+#   stat_function(fun = "dexp",
+#                 size = 1,
+#                 args = list(rate = fit.exp.pairdf$estimate[1]),
+#                 color = "green") +
+# 
+#   stat_function(fun = "dweibull",
+#                 size = 1,
+#                 args = list(shape = fit.weibull.pairdf$estimate[1], scale=fit.weibull.pairdf$estimate[2]),
+#                 color = "orange") +
+#   
+#   stat_function(fun = "dgamma",
+#                 size = 1,
+#                 args = list(shape = fit.gamma.pairdf$estimate[1], rate=fit.gamma.pairdf$estimate[2]),
+#                 color = "purple") +
+#   
+#   
+#   # The ones below here are somewhat uselss for the full dataset
+#   stat_function(fun = "dgeom",
+#                 size = 2,
+#                 args = list(prob = fit.geom.pairdf$estimate[1]),
+#                 color = "blue") +
+#   
+#   stat_function(fun = "dnbinom",
+#                 size = 1,
+#                 args = list(size = fit.nbinomial.pairdf$estimate[1], mu=fit.nbinomial.pairdf$estimate[2]),
+#                 color = "pink") +
+#   
+# 
+#   theme_minimal()
+# 
+# # Can do this later...
+# # list(mean = fit$estimate[1], sd = fit$estimate[2])) 
+# 
+# print(pair_bar)
+```
+
