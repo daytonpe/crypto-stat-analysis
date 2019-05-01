@@ -1,14 +1,14 @@
 # CS6313: Statistial Methods for Data Science -S19
 # Pat Dayton and AJ Rahendran
 
-# This question is similar to the first question. 
-# You will find the most active buyers and sellers 
-# in each of your three token network, and track them 
-# in other tokens. Develop a regression model where “buys” 
-# of the top K buyers (by number of buys or amount of buys) 
-# are regressors, and token price is the outcome. Determine a 
-# K value to have the best regression results. This means that 
-# you will develop three regression models for three tokens, 
+# This question is similar to the first question.
+# You will find the most active buyers and sellers
+# in each of your three token network, and track them
+# in other tokens. Develop a regression model where “buys”
+# of the top K buyers (by number of buys or amount of buys)
+# are regressors, and token price is the outcome. Determine a
+# K value to have the best regression results. This means that
+# you will develop three regression models for three tokens,
 # and K can be different for each model.
 
 # TODO: switch to a list
@@ -64,7 +64,7 @@ omg_edge_df_filtered = omg_edge_df %>% filter(tokenAmount < decimals*supply)
 # Set omg_edge_df to the filtered dataframe
 omg_edge_df = omg_edge_df %>% filter(tokenAmount <= decimals * supply)
 
-# Convert the timestamp to a date 
+# Convert the timestamp to a date
 omg_edge_df$Date = anydate(omg_edge_df$unixTime)
 
 print(head(omg_edge_df, 3))
@@ -93,14 +93,14 @@ top_k_buys = buys.distribution %>% arrange(-n) %>% head(K)
 edge_df_top_k <- omg_edge_df %>% filter(omg_edge_df$toID %in% top_k_buys$toID)
 
 # Create a dataframe with summarized data for fitting a regression model
-fit_data <- edge_df_top_k %>% group_by(Date) %>% 
+fit_data <- edge_df_top_k %>% group_by(Date) %>%
   summarise(
     Avg_Tok_Amt = mean(tokenAmount),
     Tot_Tok_Amt = sum(tokenAmount),
-    Transactions = n(), 
+    Transactions = n(),
     Distinct_Buyers = n_distinct(toID),
     Distinct_Sellers = n_distinct(fromID)
-  ) %>% 
+  ) %>%
   ungroup
 
 # Join edge data to pricing data based on Date
@@ -125,7 +125,7 @@ cor(fit_data$Close, fit_data$Tot_Tok_Amt)      # -0.2362847
 cor(fit_data$Close, fit_data$Avg_Tok_Amt)      # -0.4194703
 cor(fit_data$Close, fit_data$Distinct_Buyers)  #  0.5984479
 cor(fit_data$Close, fit_data$Distinct_Sellers) #  0.2065241
- 
+
 
 
 
@@ -133,8 +133,8 @@ cor(fit_data$Close, fit_data$Distinct_Sellers) #  0.2065241
 print(head(fit_data, 5))
 
 #Fit the data to a multiple linear regression model and print the summary
-fit <- lm( 
-  Close ~ Avg_Tok_Amt + 
+fit <- lm(
+  Close ~ Avg_Tok_Amt +
     Tot_Tok_Amt +
     Transactions +
     Distinct_Buyers +
@@ -151,6 +151,38 @@ layout(matrix(c(1,2,3,4),2,2)) # optional 4 graphs/page
 plot(fit) # Prints 4 Plots. Click through them to the right
 
 # # Plot Opening Price over Time
-# p = ggplot(aes(x=Open, y=Close), data = fit_data) + geom_point() 
+# p = ggplot(aes(x=Open, y=Close), data = fit_data) + geom_point()
 # # + geom_smooth(method="lm") # draw linear fit line
 # print(p)
+
+
+cat("OMG\n")
+cat("Transactions: ", cor(omg_fit_data$Close, omg_fit_data$Transactions), "\n")
+cat("Total Token Amount: ", cor(omg_fit_data$Close, omg_fit_data$Tot_Tok_Amt), "\n")
+cat("Average Token Amount: ", cor(omg_fit_data$Close, omg_fit_data$Avg_Tok_Amt), "\n")
+cat("Distinct Buyers: ", cor(omg_fit_data$Close, omg_fit_data$Distinct_Buyers), "\n")
+cat("Distinct Sellers: ", cor(omg_fit_data$Close, omg_fit_data$Distinct_Sellers), "\n")
+cat("Close Minus 1: ", cor(omg_fit_data$Close, omg_fit_data$Close_m1), "\n")
+cat("Close Minus 2: ", cor(omg_fit_data$Close, omg_fit_data$Close_m2), "\n")
+cat("Close Minus 3: ", cor(omg_fit_data$Close, omg_fit_data$Close_m3), "\n")
+
+
+cat("\n\nTRX\n")
+cat("Transactions: ", cor(trn_fit_data$Close, trn_fit_data$Transactions), "\n")
+cat("Total Token Amount: ", cor(trn_fit_data$Close, trn_fit_data$Tot_Tok_Amt), "\n")
+cat("Average Token Amount: ", cor(trn_fit_data$Close, trn_fit_data$Avg_Tok_Amt), "\n")
+cat("Distinct Buyers: ", cor(trn_fit_data$Close, trn_fit_data$Distinct_Buyers), "\n")
+cat("Distinct Sellers: ", cor(trn_fit_data$Close, trn_fit_data$Distinct_Sellers), "\n")
+cat("Close Minus 1: ", cor(trn_fit_data$Close, trn_fit_data$Close_m1), "\n")
+cat("Close Minus 2: ", cor(trn_fit_data$Close, trn_fit_data$Close_m2), "\n")
+cat("Close Minus 3: ", cor(trn_fit_data$Close, trn_fit_data$Close_m3), "\n")
+
+cat("\n\nYOC\n")
+cat("Transactions: ", cor(yoc_fit_data$Close, yoc_fit_data$Transactions), "\n")
+cat("Total Token Amount: ", cor(yoc_fit_data$Close, yoc_fit_data$Tot_Tok_Amt), "\n")
+cat("Average Token Amount: ", cor(yoc_fit_data$Close, yoc_fit_data$Avg_Tok_Amt), "\n")
+cat("Distinct Buyers: ", cor(yoc_fit_data$Close, yoc_fit_data$Distinct_Buyers), "\n")
+cat("Distinct Sellers: ", cor(yoc_fit_data$Close, yoc_fit_data$Distinct_Sellers), "\n")
+cat("Close Minus 1: ", cor(yoc_fit_data$Close, yoc_fit_data$Close_m1), "\n")
+cat("Close Minus 2: ", cor(yoc_fit_data$Close, yoc_fit_data$Close_m2), "\n")
+cat("Close Minus 3: ", cor(yoc_fit_data$Close, yoc_fit_data$Close_m3), "\n")
