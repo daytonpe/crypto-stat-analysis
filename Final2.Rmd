@@ -1,0 +1,792 @@
+---
+title: "CS6313 - Statistics Project"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
+---
+
+## Pat Dayton
+## AJ Rajendran
+
+## Initial Setup
+Set up our necessary packages. Uncomment the install.packages line the first time you run through this. 
+Set your home directory to be the src root of this project. You'll need to change this before you get started.
+```{r include = FALSE}
+# install.packages(c("plyr", "readr", "ggplot2", "dply", "fitdistrplus", "anytime", "data.table", "knitr", "tinytex"))
+library(plyr)
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(fitdistrplus)
+library(anytime)
+library(data.table)
+library(knitr)
+setwd('C:/Users/Adharsh/Documents/2019_Spring/Statistics/R Project')
+```
+
+## Load Data
+Load in all of our data. The modulo of the sum of our UTD IDs was 2, so we will be using Tronix, Omisego, and YoCoin for our analysis.
+```{r message = FALSE}
+
+omg_price_df = read.table("./tokenPrices/omisego.txt",
+                 col.names = c('Date',	'Open',	'High',	'Low',	'Close',	'Volume',	'MarketCap'),
+                 skip = 1,
+                 header = FALSE)
+trn_price_df = read.table("./tokenPrices/tron",
+                 col.names = c('Date',	'Open',	'High',	'Low',	'Close',	'Volume',	'MarketCap'),
+                 skip = 1,
+                 header = FALSE)
+yoc_price_df = read.table("./tokenPrices/yocoin",
+                 col.names = c('Date',	'Open',	'High',	'Low',	'Close',	'Volume',	'MarketCap'),
+                 skip = 1,
+                 header = FALSE)
+
+omg_edge_df <- read_delim('./edgeFiles/omisego.txt', delim = " ", col_names = F)
+trn_edge_df <- read_delim('./edgeFiles/tron.txt',    delim = " ", col_names = F)
+yoc_edge_df <- read_delim('./edgeFiles/yo.txt',      delim = " ", col_names = F)
+
+names(omg_edge_df) <- c('fromID', 'toID', 'unixTime', 'tokenAmount')
+names(trn_edge_df) <- c('fromID', 'toID', 'unixTime', 'tokenAmount')
+names(yoc_edge_df) <- c('fromID', 'toID', 'unixTime', 'tokenAmount')
+```
+
+## Prepare the Data
+### Remove Duplicates
+Check for duplicated values in all of our files and remove them.
+
+
+#### OMG
+```{r}
+cat("omg_price_df duplicates: ", anyDuplicated(omg_price_df), "  \n")
+cat("omg_edge_df  duplicates: ", anyDuplicated(omg_price_df), "  \n")
+omg_price_df <- omg_price_df %>% distinct()
+omg_edge_df  <- omg_edge_df  %>% distinct()
+cat("Duplicates Removed")
+cat("omg_edge_df  duplicates: ", anyDuplicated(omg_edge_df),  "  \n")
+cat("omg_price_df duplicates: ", anyDuplicated(omg_price_df), "  \n")
+```
+
+
+#### TRX
+```{r}
+cat("trn_price_df duplicates: ", anyDuplicated(trn_price_df), "  \n")
+cat("trn_edge_df  duplicates: ", anyDuplicated(trn_edge_df),  "  \n")
+trn_price_df <- trn_price_df %>% distinct()
+trn_edge_df  <- trn_edge_df  %>% distinct()
+cat("Duplicates Removed")
+cat("trn_price_df duplicates: ", anyDuplicated(trn_price_df), "  \n")
+cat("trn_edge_df  duplicates: ", anyDuplicated(trn_edge_df),  "  \n")
+```
+
+
+#### YOC
+```{r}
+cat("yoc_price_df duplicates: ", anyDuplicated(yoc_price_df), "  \n")
+cat("yoc_edge_df  duplicates: ", anyDuplicated(yoc_edge_df),  "  \n")
+yoc_price_df <- yoc_price_df %>% distinct()
+yoc_edge_df  <- yoc_edge_df  %>% distinct()
+cat("Duplicates Removed")
+cat("yoc_price_df duplicates: ", anyDuplicated(yoc_price_df), "  \n")
+cat("yoc_edge_df  duplicates: ", anyDuplicated(yoc_edge_df),  "  \n")
+```
+
+### Reformat Price File Dates
+Convert the date to the correct format in the price data frames.
+```{r}
+omg_price_df$Date = as.Date(omg_price_df$Date,format='%m/%d/%Y')
+trn_price_df$Date = as.Date(trn_price_df$Date,format='%m/%d/%y')
+yoc_price_df$Date = as.Date(yoc_price_df$Date,format='%m/%d/%y')
+```
+
+
+### Filter Impossibly Large Transactions
+Set our constants for each coin, then remove edge file rows where token amount is too big to make sense. 
+Note: Only YOC had records needing to be removed.
+```{r}
+omg_decimals = 10^18
+trn_decimals = 10^6
+yoc_decimals = 10^16 
+omg_supply = 140245398
+trn_supply = 66682072191
+yoc_supply = 369659255
+```
+
+
+#### OMG
+```{r}
+omg_edge_df_filtered = omg_edge_df %>% filter(tokenAmount < omg_decimals * omg_supply)
+cat("Num Rows before Filtering: ", nrow(omg_edge_df), "\n")
+cat("Num Rows after Filtering: ", nrow(omg_edge_df_filtered), "\n")
+cat("Num Rows cut: ", (nrow(omg_edge_df)-nrow(omg_edge_df_filtered)), "\n")
+omg_edge_df = omg_edge_df %>% filter(tokenAmount <= omg_decimals * omg_supply)
+```
+
+
+#### TRN
+```{r}
+trn_edge_df_filtered = trn_edge_df %>% filter(tokenAmount < trn_decimals*trn_supply)
+cat("Num Rows before Filtering: ", nrow(trn_edge_df), "\n")
+cat("Num Rows after Filtering: ", nrow(trn_edge_df_filtered), "\n")
+cat("Num Rows cut: ", (nrow(trn_edge_df)-nrow(trn_edge_df_filtered)), "\n")
+trn_edge_df = trn_edge_df %>% filter(tokenAmount <= trn_decimals * trn_supply)
+```
+
+
+#### YOC
+```{r}
+yoc_edge_df_filtered = yoc_edge_df %>% filter(yoc_edge_df$tokenAmount < yoc_decimals * yoc_supply)
+cat("Num Rows before Filtering: ", nrow(yoc_edge_df), "\n")
+cat("Num Rows after Filtering: ", nrow(yoc_edge_df_filtered), "\n")
+cat("Num Rows cut: ", (nrow(yoc_edge_df)-nrow(yoc_edge_df_filtered)), "\n")
+yoc_edge_df = yoc_edge_df %>% filter(tokenAmount <= yoc_decimals * yoc_supply)
+```
+
+### Reformat Edge File Dates
+Update the edge data frame dates to be the correct format.
+```{r}
+omg_edge_df$Date = anydate(omg_edge_df$unixTime)
+trn_edge_df$Date = anydate(trn_edge_df$unixTime)
+yoc_edge_df$Date = anydate(yoc_edge_df$unixTime)
+```
+
+## Plot Price vs. Time
+```{r}
+yoc_price_df$Date = as.Date(yoc_price_df$Date,format='%m/%d/%Y')
+trn_price_df$Date = as.Date(trn_price_df$Date,format='%m/%d/%Y')
+omg_price_df$Date = as.Date(omg_price_df$Date,format='%m/%d/%Y')
+yocoin_plot <- ggplot(aes(x=Date, y=Open), data = yoc_price_df) + geom_point(color="darkblue")
+yocoin_plot + ggtitle("YOC Historical Data") +
+  xlab("Date") + ylab("Opening Price")
+tron_plot <- ggplot(aes(x=Date, y=Open), data = trn_price_df) + geom_point(color="darkred")
+tron_plot + ggtitle("TRX Historical Data") +
+  xlab("Date") + ylab("Opening Price")
+omg_plot <- ggplot(aes(x=Date, y=Open), data = omg_price_df) + geom_point(color="darkgreen")
+omg_plot + ggtitle("OMG Historical Data") +
+  xlab("Date") + ylab("Opening Price")
+```
+
+
+---
+
+
+
+
+# Part 1 -- Buyer/Seller Pair Distribution
+## Feature Engineering
+### Create Transaction Pair Data Field
+For the sake of basic analysis, we create a value in the dataframe for pairs of buyers and sellers. 
+```{r warning = FALSE}
+yoc_edge_df$pairFrom <- paste(yoc_edge_df$fromID, '-', yoc_edge_df$toID)
+yoc_edge_df$pairTo <- paste(yoc_edge_df$toID, '-', yoc_edge_df$fromID)
+yocoin_pairFrom_counts <- as.data.frame(table(yoc_edge_df$pairFrom))
+yocoin_pairTo_counts <- as.data.frame(table(yoc_edge_df$pairTo))
+names(yocoin_pairFrom_counts) <- c('Pair', 'Transactions')
+names(yocoin_pairTo_counts) <- c('Pair', 'Transactions')
+yocoin_pairFrom_counts <- arrange(yocoin_pairFrom_counts,-Transactions)
+yocoin_pairTo_counts <- arrange(yocoin_pairTo_counts,-Transactions)
+yocoin_pairFrom_counts <- head(yocoin_pairFrom_counts, n = 100)
+yocoin_pairTo_counts <- head(yocoin_pairTo_counts, n = 100)
+trn_edge_df$pairFrom <- paste(trn_edge_df$fromID, '-', trn_edge_df$toID)
+trn_edge_df$pairTo <- paste(trn_edge_df$toID, '-', trn_edge_df$fromID)
+tron_pairFrom_counts <- as.data.frame(table(trn_edge_df$pairFrom))
+tron_pairTo_counts <- as.data.frame(table(trn_edge_df$pairTo))
+names(tron_pairFrom_counts) <- c('Pair', 'Transactions')
+names(tron_pairTo_counts) <- c('Pair', 'Transactions')
+tron_pairFrom_counts <- arrange(tron_pairFrom_counts,-Transactions)
+tron_pairTo_counts <- arrange(yocoin_pairTo_counts,-Transactions)
+tron_pairFrom_counts <- head(tron_pairFrom_counts, n = 100)
+tron_pairTo_counts <- head(tron_pairTo_counts, n = 100)
+omg_edge_df$pairFrom <- paste(omg_edge_df$fromID, '-', omg_edge_df$toID)
+omg_edge_df$pairTo <- paste(omg_edge_df$toID, '-', omg_edge_df$fromID)
+omg_pairFrom_counts <- as.data.frame(table(omg_edge_df$pairFrom))
+omg_pairTo_counts <- as.data.frame(table(omg_edge_df$pairTo))
+names(omg_pairFrom_counts) <- c('Pair', 'Transactions')
+names(omg_pairTo_counts) <- c('Pair', 'Transactions')
+omg_pairFrom_counts <- arrange(omg_pairFrom_counts,-Transactions)
+omg_pairTo_counts <- arrange(omg_pairTo_counts,-Transactions)
+omg_pairFrom_counts <- head(omg_pairFrom_counts, n = 100)
+omg_pairTo_counts <- head(omg_pairTo_counts, n = 100)
+```
+
+## Data Visualization
+###Transactions vs. Buyer/Seller
+In this section we plot the Number of Transactions against the pair of buyer and seller. This is just help us understand the distribution of transactions between user pairs. There are two graphs for each coin, respectiv to buyer and seller data.
+
+#### OMG
+```{r warning = FALSE}
+omg_plot_transFrom <- 
+  ggplot(aes(x=Pair, y=Transactions), 
+  data = omg_pairFrom_counts) + 
+  geom_point(stat = "identity", color="darkgreen")
+omg_plot_transFrom + 
+  ggtitle("OMG Transaction Data") +  
+  xlab("Buyer and Seller Pair") + 
+  theme(axis.text.x=element_blank()) +
+  ylab("Token Amount")
+omg_plot_transTo <- 
+  ggplot(aes(x=Pair, y=Transactions),
+  data = omg_pairTo_counts) + 
+  geom_point(stat = "identity", color="darkgreen")
+omg_plot_transTo +
+  ggtitle("OMG Transaction Data") +
+  xlab("Buyer and Seller Pair") +
+  theme(axis.text.x=element_blank()) +
+  ylab("Token Amount")
+```
+
+
+### TRX
+```{r warning = FALSE}
+tron_plot_transFrom <- 
+  ggplot(aes(x=Pair, y=Transactions), 
+  data = tron_pairFrom_counts) + 
+    geom_point(stat = "identity", color="darkred")
+tron_plot_transFrom + 
+  ggtitle("TRX Transaction Data") +  
+  xlab("Buyer and Seller Pair") + 
+  theme(axis.text.x=element_blank()) +
+  ylab("Token Amount")
+tron_plot_transTo <- 
+  ggplot(aes(x=Pair, y=Transactions), 
+    data = tron_pairTo_counts) + 
+    geom_point(stat = "identity", color="darkred")
+tron_plot_transTo +
+  ggtitle("TRX Transaction Data") +
+  xlab("Buyer and Seller Pair") +
+  theme(axis.text.x=element_blank()) +
+  ylab("Token Amount")
+```
+
+
+### YOC
+```{r warning = FALSE}
+yocoin_plot_transFrom <- 
+  ggplot(aes(x=Pair, y=Transactions), 
+  data = yocoin_pairFrom_counts) + 
+  geom_point(stat = "identity", color="darkblue")
+yocoin_plot_transFrom + 
+  ggtitle("YOC Transaction Data") + 
+  xlab("Buyer and Seller Pair") + 
+  theme(axis.text.x=element_blank()) +
+  ylab("Number of Transactions")
+yocoin_plot_transTo <- 
+  ggplot(aes(x=Pair, y=Transactions), 
+  data = yocoin_pairTo_counts) + 
+  geom_point(stat = "identity", color="darkblue")
+yocoin_plot_transTo + 
+  ggtitle("YOC Transaction Data") +
+  xlab("Buyer and Seller Pair") + 
+  theme(axis.text.x=element_blank()) +
+  ylab("Number of Transactions")
+```
+
+###Transactions vs. Buyer/Seller (Top-K only)
+In this section we take the the same data from above and take into a narrower scope, only 20 of the top transaction amounts. From this we begin calculating the distributions of the transaction data.
+```{r warning = FALSE}
+yocoin_buys.distribution <- yoc_edge_df %>% group_by(toID) %>% summarise(n = n()) %>% ungroup
+yocoin_sells.distribution <- yoc_edge_df %>% group_by(fromID) %>% summarise(n = n()) %>% ungroup
+tron_buys.distribution <- trn_edge_df %>% group_by(toID) %>% summarise(n = n()) %>% ungroup
+tron_sells.distribution <- trn_edge_df %>% group_by(fromID) %>% summarise(n = n()) %>% ungroup
+omg_buys.distribution <- omg_edge_df %>% group_by(toID) %>% summarise(n = n()) %>% ungroup
+omg_sells.distribution <- omg_edge_df %>% group_by(fromID) %>% summarise(n = n()) %>% ungroup
+print("Buys Top 20")
+print(yocoin_buys.distribution %>% arrange(-n) %>% head(20))
+print(tron_buys.distribution %>% arrange(-n) %>% head(20))
+print(omg_buys.distribution %>% arrange(-n) %>% head(20))
+print("Sells Top 20")
+print(yocoin_sells.distribution %>% arrange(-n) %>% head(20))
+print(tron_sells.distribution %>% arrange(-n) %>% head(20))
+print(omg_sells.distribution %>% arrange(-n) %>% head(20))
+```
+
+### Visualize the Data
+This section takes the seller and buyer distribution data, orders it by decreasing amount and limits the amount to 20.
+Once theses calculations are completed, we plot these data frames into respective bar charts and provide numeric values at the top of the bar.
+This data is far more useful in showing the transaction data.
+
+##YOC
+
+```{r warning = FALSE}
+yocoin_sell_df = yocoin_sells.distribution %>% arrange(-n) %>% head(20)
+yocoin_sell_df$row_id <- as.numeric(row.names(yocoin_sell_df))
+yocoin_sells_quant_bar = ggplot(data=yocoin_sell_df, aes(x=row_id, y=n)) +
+  geom_bar(stat="identity", fill="steelblue")+
+  geom_text(aes(label=n), vjust=-0.3, size=3.5)+
+  theme_minimal()
+print(yocoin_sells_quant_bar)
+yocoin_buy_df = yocoin_buys.distribution %>% arrange(-n) %>% head(20)
+yocoin_buy_df$row_id <- as.numeric(row.names(yocoin_buy_df))
+yocoin_buys_quant_bar = ggplot(data=yocoin_buy_df, aes(x=row_id, y=n)) +
+  geom_bar(stat="identity", fill="steelblue")+
+  geom_text(aes(label=n), vjust=-0.3, size=3.5)+
+  theme_minimal()
+print(yocoin_buys_quant_bar)
+```
+
+
+##TRON
+
+```{r warning = FALSE}
+tron_sell_df = yocoin_sells.distribution %>% arrange(-n) %>% head(20)
+tron_sell_df$row_id <- as.numeric(row.names(tron_sell_df))
+tron_sells_quant_bar = ggplot(data=tron_sell_df, aes(x=row_id, y=n)) +
+  geom_bar(stat="identity", fill="steelblue")+
+  geom_text(aes(label=n), vjust=-0.3, size=3.5)+
+  theme_minimal()
+print(tron_sells_quant_bar)
+tron_buy_df = yocoin_buys.distribution %>% arrange(-n) %>% head(20)
+tron_buy_df$row_id <- as.numeric(row.names(tron_buy_df))
+tron_buys_quant_bar = ggplot(data=tron_buy_df, aes(x=row_id, y=n)) +
+  geom_bar(stat="identity", fill="steelblue")+
+  geom_text(aes(label=n), vjust=-0.3, size=3.5)+
+  theme_minimal()
+print(tron_buys_quant_bar)
+```
+
+
+##OMG
+
+```{r warning = FALSE}
+omg_sell_df = omg_sells.distribution %>% arrange(-n) %>% head(20)
+omg_sell_df$row_id <- as.numeric(row.names(omg_sell_df))
+omg_sells_quant_bar = ggplot(data=omg_sell_df, aes(x=row_id, y=n)) +
+  geom_bar(stat="identity", fill="steelblue")+
+  geom_text(aes(label=n), vjust=-0.3, size=3.5)+
+  theme_minimal()
+print(omg_sells_quant_bar)
+omg_buy_df = omg_buys.distribution %>% arrange(-n) %>% head(20)
+omg_buy_df$row_id <- as.numeric(row.names(omg_buy_df))
+omg_buys_quant_bar = ggplot(data=omg_buy_df, aes(x=row_id, y=n)) +
+  geom_bar(stat="identity", fill="steelblue")+
+  geom_text(aes(label=n), vjust=-0.3, size=3.5)+
+  theme_minimal()
+print(omg_buys_quant_bar)
+```
+
+
+This section is dedicated to making getting proper buying distributions (ordered and truncated to the top 100). We calculate the total volume of the transactions. After that we filter the data, apply some scaling attributes and normalize the data.
+
+```{r warning = FALSE}
+yocoin_by_pair_df = yoc_edge_df %>% group_by(pairFrom) %>% summarise(n = n()) %>% arrange(-n) %>% ungroup
+print(yocoin_by_pair_df %>% head(100))
+tron_by_pair_df = trn_edge_df %>% group_by(pairFrom) %>% summarise(n = n()) %>% arrange(-n) %>% ungroup
+print(yocoin_by_pair_df %>% head(100))
+omg_by_pair_df = omg_edge_df %>% group_by(pairFrom) %>% summarise(n = n()) %>% arrange(-n) %>% ungroup
+print(yocoin_by_pair_df %>% head(100))
+yocoin_total_trade_volume = sum(yocoin_by_pair_df$n)
+tron_total_trade_volume = sum(tron_by_pair_df$n)
+omg_total_trade_volume = sum(omg_by_pair_df$n)
+
+yocoin_pair_df = yocoin_by_pair_df %>% head(100)
+yocoin_pair_df$row_id <- as.numeric(row.names(yocoin_pair_df))
+yocoin_pair_df$n_scaled <- (yocoin_pair_df$n - min(yocoin_pair_df$n) + 0.001) / (max(yocoin_pair_df$n) - min(yocoin_pair_df$n) + 0.002)
+tron_pair_df = tron_by_pair_df %>% head(100)
+tron_pair_df$row_id <- as.numeric(row.names(tron_pair_df))
+tron_pair_df$n_scaled <- (tron_pair_df$n - min(tron_pair_df$n) + 0.001) / (max(tron_pair_df$n) - min(tron_pair_df$n) + 0.002)
+omg_pair_df = yocoin_by_pair_df %>% head(100)
+omg_pair_df$row_id <- as.numeric(row.names(omg_pair_df))
+omg_pair_df$n_scaled <- (omg_pair_df$n - min(omg_pair_df$n) + 0.001) / (max(omg_pair_df$n) - min(omg_pair_df$n) + 0.002)
+
+yocoin_pair_df$n_norm = yocoin_pair_df$n / yocoin_total_trade_volume
+tron_pair_df$n_norm = tron_pair_df$n / tron_total_trade_volume
+omg_pair_df$n_norm = omg_pair_df$n / omg_total_trade_volume
+```
+
+## Fit Distributions
+From here we take the data, and apply some different distributions. 
+- Log Normal
+- Exponential
+- Geometric
+- Weibull
+- Gamma
+- Negative Binomial
+
+```{r warning = FALSE}
+as.data.frame(yocoin_pair_df)
+as.data.frame(tron_pair_df)
+as.data.frame(omg_pair_df)
+keeps <- c("n_scaled", "n", "row_id")
+yocoin_clean_data <- as.data.frame(yocoin_pair_df)[keeps]
+tron_clean_data <- as.data.frame(tron_pair_df)[keeps]
+omg_clean_data <- as.data.frame(omg_pair_df)[keeps]
+fit.lnorm.yocoin_pair_df = fitdistr(yocoin_clean_data$n, densfun='lognormal')
+fit.exp.yocoin_pair_df = fitdistr(yocoin_clean_data$n, densfun='exponential')
+fit.geom.yocoin_pair_df = fitdistr(yocoin_clean_data$n, densfun='geometric')
+# fit.weibull.yocoin_pair_df = fitdistr(yocoin_clean_data$n, densfun='weibull')
+fit.gamma.yocoin_pair_df = fitdistr(yocoin_clean_data$n, densfun='gamma')
+fit.nbinomial.yocoin_pair_df = fitdistr(yocoin_clean_data$n, densfun='negative binomial')
+fit.lnorm.tron_pair_df = fitdistr(tron_clean_data$n, densfun='lognormal')
+fit.exp.tron_pair_df = fitdistr(tron_clean_data$n, densfun='exponential')
+fit.geom.tron_pair_df = fitdistr(tron_clean_data$n, densfun='geometric')
+fit.weibull.tron_pair_df = fitdistr(tron_clean_data$n, densfun='weibull')
+fit.gamma.tron_pair_df = fitdistr(tron_clean_data$n, densfun='gamma')
+fit.nbinomial.tron_pair_df = fitdistr(tron_clean_data$n, densfun='negative binomial')
+fit.lnorm.omg_pair_df = fitdistr(omg_clean_data$n, densfun='lognormal')
+fit.exp.omg_pair_df = fitdistr(omg_clean_data$n, densfun='exponential')
+fit.geom.omg_pair_df = fitdistr(omg_clean_data$n, densfun='geometric')
+# fit.weibull.omg_pair_df = fitdistr(omg_clean_data$n, densfun='weibull')
+fit.gamma.omg_pair_df = fitdistr(omg_clean_data$n, densfun='gamma')
+fit.nbinomial.omg_pair_df = fitdistr(omg_clean_data$n, densfun='negative binomial')
+```
+
+This section is just to set up and show the plot for each of the coins and their processed data.
+
+```{r warning = FALSE}
+yocoin_pair_bar = ggplot(yocoin_clean_data) + geom_histogram(mapping = aes(x = n), stat = "density", fill="steelblue") +
+  stat_function( fun = "dlnorm",
+                 args = list(meanlog = fit.lnorm.yocoin_pair_df$estimate[1], sdlog = fit.lnorm.yocoin_pair_df$estimate[2]),
+                 n = 100,
+                 size = 1,
+                 color = "red") +
+  stat_function(fun = "dexp",
+                size = 1,
+                args = list(rate = fit.exp.yocoin_pair_df$estimate[1]),
+                color = "darkgreen") +
+  # stat_function(fun = "dweibull",
+  #               size = 1,
+  #               args = list(shape = fit.weibull.yocoin_pair_df$estimate[1],
+  #               scale=fit.weibull.yocoin_pair_df$estimate[2]),
+  #               color = "orange") +
+  stat_function(fun = "dgamma",
+                size = 1,
+                args = list(shape = fit.gamma.yocoin_pair_df$estimate[1],
+                rate=fit.gamma.yocoin_pair_df$estimate[2]),
+                color = "purple") +
+  stat_function(fun = "dgeom",
+                size = 2,
+                args = list(prob = fit.geom.yocoin_pair_df$estimate[1]),
+                color = "blue") +
+  stat_function(fun = "dnbinom",
+                size = 1,
+                args = list(size = fit.nbinomial.yocoin_pair_df$estimate[1],
+                mu=fit.nbinomial.yocoin_pair_df$estimate[2]),
+                color = "pink") +
+  theme_minimal()
+tron_pair_bar = ggplot(tron_clean_data) + geom_histogram(mapping = aes(x = n), stat = "density", fill="steelblue") +
+  stat_function( fun = "dlnorm",
+                 args = list(meanlog = fit.lnorm.tron_pair_df$estimate[1], sdlog = fit.lnorm.tron_pair_df$estimate[2]),
+                 n = 100,
+                 size = 1,
+                 color = "red") +
+  stat_function(fun = "dexp",
+                size = 1,
+                args = list(rate = fit.exp.tron_pair_df$estimate[1]),
+                color = "darkgreen") +
+  stat_function(fun = "dweibull",
+                size = 1,
+                args = list(shape = fit.weibull.tron_pair_df$estimate[1],
+                scale=fit.weibull.tron_pair_df$estimate[2]),
+                color = "orange") +
+  stat_function(fun = "dgamma",
+                size = 1,
+                args = list(shape = fit.gamma.tron_pair_df$estimate[1],
+                rate=fit.gamma.tron_pair_df$estimate[2]),
+                color = "purple") +
+  stat_function(fun = "dgeom",
+                size = 2,
+                args = list(prob = fit.geom.tron_pair_df$estimate[1]),
+                color = "blue") +
+  stat_function(fun = "dnbinom",
+                size = 1,
+                args = list(size = fit.nbinomial.tron_pair_df$estimate[1],
+                mu=fit.nbinomial.tron_pair_df$estimate[2]),
+                color = "pink") +
+  theme_minimal()
+omg_pair_bar = ggplot(omg_clean_data) + geom_histogram(mapping = aes(x = n), stat = "density", fill="steelblue") +
+  stat_function( fun = "dlnorm",
+                 args = list(meanlog = fit.lnorm.omg_pair_df$estimate[1], sdlog = fit.lnorm.omg_pair_df$estimate[2]),
+                 n = 100,
+                 size = 1,
+                 color = "red") +
+  stat_function(fun = "dexp",
+                size = 1,
+                args = list(rate = fit.exp.omg_pair_df$estimate[1]),
+                color = "darkgreen") +
+  # stat_function(fun = "dweibull",
+  #               size = 1,
+  #               args = list(shape = fit.weibull.omg_pair_df$estimate[1],
+  #               scale=fit.weibull.omg_pair_df$estimate[2]),
+  #               color = "orange") +
+  stat_function(fun = "dgamma",
+                size = 1,
+                args = list(shape = fit.gamma.omg_pair_df$estimate[1],
+                rate=fit.gamma.omg_pair_df$estimate[2]),
+                color = "purple") +
+  stat_function(fun = "dgeom",
+                size = 2,
+                args = list(prob = fit.geom.omg_pair_df$estimate[1]),
+                color = "blue") +
+  stat_function(fun = "dnbinom",
+                size = 1,
+                args = list(size = fit.nbinomial.omg_pair_df$estimate[1],
+                mu=fit.nbinomial.omg_pair_df$estimate[2]),
+                color = "pink") +
+  theme_minimal()
+
+print(yocoin_pair_bar)
+print(tron_pair_bar)
+print(omg_pair_bar)
+```
+
+
+
+
+
+## Conclusion and Observations
+
+For all 3 of the coins, the distribution that best fit was log norm. Gamma was a very close second. This conclusion makes senses because of log-normal's real world application. A good example of log-normal is the amount of time users spend on a webpage. Given the popularity of cryptocurrency in recent years, it makes sense that as the number of transactions increase, more amateur users will likely spend less and less. Since the gamma distribution has very similar behavior, it makes sense it would be the next greatest fit.
+
+For some reason, we faced issues applying the weibull distribution to the Omisego and YoCoin currencies. Our assumption is that the datasets for these two currencies are not being accepted into the distribution function.
+
+Aside from this, the geometric and negative bionomial distributions do not yield useful results. These distributions slightly match the data's shape but not enough to be considered a good fit.
+
+
+
+---
+# Part 2 -- Multiple Linear Regression
+##Feature Engineering
+Determine some extrea features on which we can create our multiple linear regressions.
+
+###Determine Buys/Sells by Top Buyers/Sellers
+Calculate number of buys and sells by user_id
+Great description here: https://stackoverflow.com/questions/25869378/what-does-n-n-mean-in-r
+```{r warning = FALSE}
+omg_buys  <- omg_edge_df %>% group_by(toID) %>% summarise(n = n()) %>% ungroup
+trn_buys  <- trn_edge_df %>% group_by(toID) %>% summarise(n = n()) %>% ungroup
+yoc_buys  <- yoc_edge_df %>% group_by(toID) %>% summarise(n = n()) %>% ungroup
+omg_sells <- omg_edge_df %>% group_by(fromID) %>% summarise(n = n()) %>% ungroup
+trn_sells <- trn_edge_df %>% group_by(fromID) %>% summarise(n = n()) %>% ungroup
+yoc_sells <- yoc_edge_df %>% group_by(fromID) %>% summarise(n = n()) %>% ungroup
+```
+
+
+### Filter by Top-K Buyers and Build Features
+Filter to only include top K buyers and build a dataframe with the summarized data for fitting a regression model.
+Features we create here include:
+- Avg_Tok_Amt: Average Token Amount traded for the top-K users on the given day
+- Tot_Tok_Amt: Total Token Amount traded by the top-K users on the given day
+- Transactions: Number of transactions by the top-K users on the given day
+- Distinct Buyers: Distinct number of buyers for a given day
+- Distinct Sellers: Distinct number of sellers for a given day
+
+```{r warning = FALSE}
+K_omg = 104
+K_trn = 18000
+K_yoc = 136
+
+omg_buys = omg_buys %>% arrange(-n) %>% head(K_omg)
+trn_buys = trn_buys %>% arrange(-n) %>% head(K_trn)
+yoc_buys = yoc_buys %>% arrange(-n) %>% head(K_yoc)
+omg_top_k_buys <- omg_edge_df %>% filter(omg_edge_df$toID %in% omg_buys$toID)
+trn_top_k_buys <- trn_edge_df %>% filter(trn_edge_df$toID %in% trn_buys$toID)
+yoc_top_k_buys <- yoc_edge_df %>% filter(yoc_edge_df$toID %in% yoc_buys$toID)
+
+omg_fit_data <- omg_top_k_buys %>% group_by(Date) %>% 
+  summarise(
+    Avg_Tok_Amt = mean(tokenAmount),
+    Tot_Tok_Amt = sum(tokenAmount),
+    Transactions = n(), 
+    Distinct_Buyers = n_distinct(toID),
+    Distinct_Sellers = n_distinct(fromID)
+  ) %>% 
+  ungroup
+trn_fit_data <- trn_top_k_buys %>% group_by(Date) %>% 
+  summarise(
+    Avg_Tok_Amt = mean(tokenAmount),
+    Tot_Tok_Amt = sum(tokenAmount),
+    Transactions = n(), 
+    Distinct_Buyers = n_distinct(toID),
+    Distinct_Sellers = n_distinct(fromID)
+  ) %>% 
+  ungroup
+yoc_fit_data <- yoc_top_k_buys %>% group_by(Date) %>% 
+  summarise(
+    Avg_Tok_Amt = mean(tokenAmount),
+    Tot_Tok_Amt = sum(tokenAmount),
+    Transactions = n(), 
+    Distinct_Buyers = n_distinct(toID),
+    Distinct_Sellers = n_distinct(fromID)
+  ) %>% 
+  ungroup
+```
+
+### Join Tables
+Join edge data to pricing data based on the Date. 
+We lose a small percentage of the data here due to the fact that the timeframes for the two data files do not match perfectly.
+```{r warning = FALSE}
+omg_fit_data <- merge(omg_fit_data, omg_price_df, by="Date")
+trn_fit_data <- merge(trn_fit_data, trn_price_df, by="Date")
+yoc_fit_data <- merge(yoc_fit_data, yoc_price_df, by="Date")
+```
+
+### Add Historic Data to Data Frame
+Calculate the close values of the previous 3 days.
+Note: m1 refers to minus 1, i.e. one day previous
+```{r warning = FALSE}
+omg_fit_data$Close_m1 <- shift(omg_fit_data$Close, n=1)
+omg_fit_data$Close_m2 <- shift(omg_fit_data$Close, n=2)
+omg_fit_data$Close_m3 <- shift(omg_fit_data$Close, n=3)
+trn_fit_data$Close_m1 <- shift(trn_fit_data$Close, n=1)
+trn_fit_data$Close_m2 <- shift(trn_fit_data$Close, n=2)
+trn_fit_data$Close_m3 <- shift(trn_fit_data$Close, n=3)
+yoc_fit_data$Close_m1 <- shift(yoc_fit_data$Close, n=1)
+yoc_fit_data$Close_m2 <- shift(yoc_fit_data$Close, n=2)
+yoc_fit_data$Close_m3 <- shift(yoc_fit_data$Close, n=3)
+```
+
+## Inspecting the Data
+Let's take a look at our data with our newly engineered features on which we will fit our multiple regression model.
+```{r warning = FALSE}
+omg_fit_data
+trn_fit_data
+yoc_fit_data
+```
+
+
+Let's also take a look at how many days are tracked for the three tokens in our data sets.
+We have the most data for YOC.
+```{r warning = FALSE}
+cat("OMG Rows: ", nrow(omg_fit_data), "\n")
+cat("TRX Rows: ", nrow(trn_fit_data), "\n")
+cat("YOC Rows: ", nrow(yoc_fit_data), "\n")
+```
+
+## Correlation of Regressors
+We chose to regress to the Close value of the token, so we will compare the correlation of each of the regressors (Xs) to the Close (Y).
+
+We can make the observation from this data that the previous day's prices are far more correlated to the Close price on the day when compared to the token amounts, distinct buyers, and other features we engineered. This is expected.
+
+
+#### OMG
+```{r warning = FALSE}
+cat("\t\tTransactions:         ", cor(omg_fit_data$Close, omg_fit_data$Transactions), "\n",
+    "\tTotal Token Amount:  ", cor(omg_fit_data$Close, omg_fit_data$Tot_Tok_Amt), "\n",
+    "\tAverage Token Amount:", cor(omg_fit_data$Close, omg_fit_data$Avg_Tok_Amt), "\n",
+    "\tDistinct Buyers:      ", cor(omg_fit_data$Close, omg_fit_data$Distinct_Buyers), "\n",
+    "\tDistinct Sellers:     ", cor(omg_fit_data$Close, omg_fit_data$Distinct_Sellers), "\n",
+    "\tClose Minus 1:        ", cor(omg_fit_data$Close, omg_fit_data$Close_m1, use = "complete.obs"), "\n",
+    "\tClose Minus 2:        ", cor(omg_fit_data$Close, omg_fit_data$Close_m2, use = "complete.obs"), "\n",
+    "\tClose Minus 3:        ", cor(omg_fit_data$Close, omg_fit_data$Close_m3, use = "complete.obs"), "\n")
+```
+
+
+#### TRX
+```{r warning = FALSE}
+cat("\t\tTransactions:         ", cor(trn_fit_data$Close, trn_fit_data$Transactions), "\n",
+    "\tTotal Token Amount:   ", cor(trn_fit_data$Close, trn_fit_data$Tot_Tok_Amt), "\n",
+    "\tAverage Token Amount:", cor(trn_fit_data$Close, trn_fit_data$Avg_Tok_Amt), "\n",
+    "\tDistinct Buyers:      ", cor(trn_fit_data$Close, trn_fit_data$Distinct_Buyers), "\n",
+    "\tDistinct Sellers:     ", cor(trn_fit_data$Close, trn_fit_data$Distinct_Sellers), "\n",
+    "\tClose Minus 1:        ", cor(trn_fit_data$Close, trn_fit_data$Close_m1, use = "complete.obs"), "\n",
+    "\tClose Minus 2:        ", cor(trn_fit_data$Close, trn_fit_data$Close_m2, use = "complete.obs"), "\n",
+    "\tClose Minus 3:        ", cor(trn_fit_data$Close, trn_fit_data$Close_m3, use = "complete.obs"), "\n")
+```
+
+#### YOC
+```{r warning = FALSE}
+cat("\t\tTransactions:        ", cor(yoc_fit_data$Close, yoc_fit_data$Transactions), "\n",
+    "\tTotal Token Amount:  ", cor(yoc_fit_data$Close, yoc_fit_data$Tot_Tok_Amt), "\n",
+    "\tAverage Token Amount:", cor(yoc_fit_data$Close, yoc_fit_data$Avg_Tok_Amt), "\n",
+    "\tDistinct Buyers:      ", cor(yoc_fit_data$Close, yoc_fit_data$Distinct_Buyers), "\n",
+    "\tDistinct Sellers:     ", cor(yoc_fit_data$Close, yoc_fit_data$Distinct_Sellers), "\n",
+    "\tClose Minus 1:        ", cor(yoc_fit_data$Close, yoc_fit_data$Close_m1, use = "complete.obs"), "\n",
+    "\tClose Minus 2:        ", cor(yoc_fit_data$Close, yoc_fit_data$Close_m2, use = "complete.obs"), "\n",
+    "\tClose Minus 3:        ", cor(yoc_fit_data$Close, yoc_fit_data$Close_m3, use = "complete.obs"), "\n")
+```
+
+## Create the Multiple Linear Regression Model
+Time to actually perform the fit via multiple linear regression. We will split each coin into two different models. The first considering the previous 3 days of Close prices. The second only focusing on the features we engineered. As the previous three days were so highly correlated with the price, they make the R^2 value significantly higher and we lose some understanding of which one of the engineered features actually contributes the most. 
+
+Note: The models ending in "_hist" take the price history for the three previous days into account. Those with "_no_hist" endings do not.
+```{r warning = FALSE}
+omg_fit_hist <- lm(
+  Close ~ Avg_Tok_Amt +
+    Tot_Tok_Amt +
+    Transactions +
+    Distinct_Buyers +
+    Distinct_Sellers +
+    Close_m1 +
+    Close_m2 +
+    Close_m3,
+  data=omg_fit_data)
+omg_fit_no_hist <- lm(
+  Close ~ Avg_Tok_Amt +
+    Tot_Tok_Amt +
+    Transactions +
+    Distinct_Buyers +
+    Distinct_Sellers,
+  data=omg_fit_data)
+trn_fit_hist <- lm(
+  Close ~ Avg_Tok_Amt +
+    Tot_Tok_Amt +
+    Transactions +
+    Distinct_Buyers +
+    Distinct_Sellers +
+    Close_m1 +
+    Close_m2 +
+    Close_m3,
+  data=trn_fit_data)
+trn_fit_no_hist <- lm(
+  Close ~ Avg_Tok_Amt +
+    Tot_Tok_Amt +
+    Transactions +
+    Distinct_Buyers +
+    Distinct_Sellers,
+  data=trn_fit_data)
+yoc_fit_hist <- lm(
+  Close ~ Avg_Tok_Amt +
+    Tot_Tok_Amt +
+    Transactions +
+    Distinct_Buyers +
+    Distinct_Sellers +
+    Close_m1 +
+    Close_m2 +
+    Close_m3,
+  data=yoc_fit_data)
+yoc_fit_no_hist <- lm(
+  Close ~ Avg_Tok_Amt +
+    Tot_Tok_Amt +
+    Transactions +
+    Distinct_Buyers +
+    Distinct_Sellers,
+  data=yoc_fit_data)
+```
+###OMG Summary Data and Plots for Model with Close History
+```{r warning = FALSE}
+print(summary(omg_fit_hist))
+plot(omg_fit_hist)
+```
+###OMG Summary Data and Plots for Model without Close History
+```{r warning = FALSE}
+print(summary(omg_fit_no_hist))
+plot(omg_fit_no_hist)
+```
+###TRX Summary Data and Plots for Model with Close History
+```{r warning = FALSE}
+print(summary(trn_fit_hist))
+plot(trn_fit_hist)
+```
+###TRX Summary Data and Plots for Models without Close History
+```{r warning = FALSE}
+print(summary(trn_fit_no_hist))
+plot(trn_fit_no_hist)
+```
+###YOC Summary Data and Plots for Model with Close History
+```{r warning = FALSE}
+print(summary(yoc_fit_hist))
+plot(yoc_fit_hist)
+```
+###YOC Summary Data and Plots for Models without Close History
+```{r warning = FALSE}
+print(summary(yoc_fit_no_hist))
+plot(yoc_fit_no_hist)
+```
+## Conclusion
+We find that including the last three days of close prices really overpowers any gains we make via our engineered regressors. All three give us values over .95 for R^2 which is great! Unfortunately it this will not be able to predict quick spikes or drops in the price as it is simply going to estimate a linear trajectory based on the previous days' action.
+If we disregard the previous days' close prices, we are able to get the follwing R^2 values after [manually] experimenting with K values representing the top K buyers.
+- OMG: 0.4418 (K=104)
+- TRN: ~0.8115 (K=~18,000)
+- YOC: 0.2551 (K=135)
+Note that TRN's K value which produced the highest R^2 Value was exceptionally high compared to OMG and YOC. We plan to explore why this was the case in our writeup.
