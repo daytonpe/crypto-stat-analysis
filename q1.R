@@ -84,7 +84,7 @@ sells_quant_bar = ggplot(data=selldf, aes(x=row_id, y=n)) +
   geom_bar(stat="identity", fill="steelblue")+
   geom_text(aes(label=n), vjust=-0.3, size=3.5)+
   theme_minimal()
-print(sells_quant_bar)
+# print(sells_quant_bar)
 
 # Create a bar chart to plot the top 20 sellers by their total tokens sold.
 buydf = buys.distribution %>% arrange(-n) %>% head(20)
@@ -93,7 +93,7 @@ buys_quant_bar = ggplot(data=buydf, aes(x=row_id, y=n)) +
   geom_bar(stat="identity", fill="steelblue")+
   geom_text(aes(label=n), vjust=-0.3, size=3.5)+
   theme_minimal()
-print(buys_quant_bar)
+# print(buys_quant_bar)
 
 
 # Sort into sale partners per question 2
@@ -128,6 +128,7 @@ keeps <- c("n_scaled", "n", "row_id")
 clean_data <- as.data.frame(pairdf)[keeps]
 print(clean_data)
 
+print(clean_data)
 
 fit.lnorm.pairdf = fitdistr(clean_data$n, densfun='lognormal')
 fit.exp.pairdf = fitdistr(clean_data$n, densfun='exponential')
